@@ -66,6 +66,9 @@ data class OpProgress(val title: String, val current: String = "", val fraction:
 sealed interface UiEvent {
     data class Edit(val file: RemoteFile) : UiEvent
     data class ViewImage(val file: RemoteFile) : UiEvent
+
+    /** An intent for another app; it is started from the Activity so it opens on top of this app. */
+    data class Launch(val intent: Intent) : UiEvent
 }
 
 enum class CleanMode { Large, Duplicates }
@@ -548,7 +551,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
         when {
             isEditable(f) -> eventChannel.trySend(UiEvent.Edit(f))
             kindOf(f) == FileKind.Image && f.extension != "svg" -> eventChannel.trySend(UiEvent.ViewImage(f))
-            else -> openExternal(f)
+            else -> openExternal(f, chooser = false)
         }
     }
 
@@ -556,19 +559,14 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
         eventChannel.trySend(UiEvent.Edit(f))
     }
 
-    fun openExternal(f: RemoteFile) = runOp("آماده‌سازی فایل") { _, report ->
+    fun openExternal(f: RemoteFile, chooser: Boolean = true) = runOp("آماده‌سازی فایل") { _, report ->
         val uri = uriFor(f, report)
         val mime = mimeOf(f)
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, mime)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
         }
-        val chooser = Intent.createChooser(intent, "باز کردن با").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        try {
-            getApplication<Application>().startActivity(chooser)
-        } catch (_: ActivityNotFoundException) {
-            throw IOException("برنامه‌ای برای باز کردن این فایل پیدا نشد")
-        }
+        eventChannel.trySend(UiEvent.Launch(if (chooser) Intent.createChooser(intent, "باز کردن با") else intent))
         null
     }
 
@@ -588,9 +586,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        getApplication<Application>().startActivity(
-            Intent.createChooser(intent, "اشتراک‌گذاری").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        )
+        eventChannel.trySend(UiEvent.Launch(Intent.createChooser(intent, "اشتراک‌گذاری")))
         clearSelection()
         null
     }

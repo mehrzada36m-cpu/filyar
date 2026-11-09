@@ -1,7 +1,9 @@
 package com.filyar.app
 
+import android.content.ActivityNotFoundException
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -17,12 +19,14 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -37,6 +41,7 @@ import com.filyar.app.ui.ImageViewerScreen
 import com.filyar.app.ui.ProgressDialog
 import com.filyar.app.ui.UiEvent
 import com.filyar.app.ui.theme.FilyarTheme
+import com.filyar.app.ui.theme.isDarkTheme
 
 private sealed interface Screen {
     data object Browser : Screen
@@ -55,6 +60,15 @@ class MainActivity : ComponentActivity() {
         setContent {
             val vp by vm.viewPrefs.collectAsStateWithLifecycle()
             val styles by vm.folderStyles.collectAsStateWithLifecycle()
+            // The bars follow the app's own theme, not the phone's, so clock and battery icons stay readable.
+            val dark = isDarkTheme(vp.theme)
+            DisposableEffect(dark) {
+                enableEdgeToEdge(
+                    statusBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT) { dark },
+                    navigationBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT) { dark },
+                )
+                onDispose {}
+            }
             FilyarTheme(vp.theme, vp.dynamicColor) {
                 CompositionLocalProvider(
                     LocalLayoutDirection provides LayoutDirection.Rtl,
@@ -82,12 +96,18 @@ private fun AppRoot(vm: BrowserViewModel) {
     val screen: Screen = if (base == Screen.Browser && clean.mode != null) Screen.Clean else base
     val snackbar = remember { SnackbarHostState() }
     val progress by vm.progress.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         vm.events.collect {
-            base = when (it) {
-                is UiEvent.Edit -> Screen.Editor(it.file)
-                is UiEvent.ViewImage -> Screen.Viewer(it.file)
+            when (it) {
+                is UiEvent.Edit -> base = Screen.Editor(it.file)
+                is UiEvent.ViewImage -> base = Screen.Viewer(it.file)
+                is UiEvent.Launch -> try {
+                    context.startActivity(it.intent)
+                } catch (_: ActivityNotFoundException) {
+                    vm.toast("برنامه‌ای برای باز کردن این فایل پیدا نشد")
+                }
             }
         }
     }
