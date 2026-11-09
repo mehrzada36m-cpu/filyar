@@ -14,6 +14,9 @@ enum class LongPressAction { Icon, Select }
 /** How a folder is drawn: rounded tile, circle, bare icon, or outlined tile. */
 enum class FolderModel { Tile, Circle, Plain, Outline }
 
+/** Home screen layout: big cards, or a classic sectioned list. */
+enum class HomeStyle { Cards, Classic }
+
 data class ViewPrefs(
     val sort: SortBy = SortBy.Name,
     val ascending: Boolean = true,
@@ -29,6 +32,7 @@ data class ViewPrefs(
     /** Index into the accent palette; -1 keeps the default teal. */
     val accent: Int = -1,
     val folderModel: FolderModel = FolderModel.Tile,
+    val homeStyle: HomeStyle = HomeStyle.Cards,
 )
 
 /** A user-chosen look for one folder: icon key and colour index (-1 = default colour). */
@@ -56,6 +60,7 @@ class Prefs(context: Context) {
             folderLongPress = enumPref("folderLongPress", LongPressAction.Icon),
             accent = sp.getInt("accent", -1),
             folderModel = enumPref("folderModel", FolderModel.Tile),
+            homeStyle = enumPref("homeStyle", HomeStyle.Cards),
         )
     )
     val view: StateFlow<ViewPrefs> = _view.asStateFlow()
@@ -88,6 +93,7 @@ class Prefs(context: Context) {
             .putString("folderLongPress", v.folderLongPress.name)
             .putInt("accent", v.accent)
             .putString("folderModel", v.folderModel.name)
+            .putString("homeStyle", v.homeStyle.name)
             .apply()
     }
 

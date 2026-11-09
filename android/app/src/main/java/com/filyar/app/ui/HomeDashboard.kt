@@ -1,5 +1,11 @@
 package com.filyar.app.ui
 
+import androidx.compose.foundation.clickable
+import com.filyar.app.core.HomeStyle
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -77,6 +83,30 @@ private val friendlyNames = mapOf(
 
 @Composable
 fun HomeDashboard(
+
+    rootPath: String,
+    shizuku: ShizukuStatus,
+    localAccess: Boolean,
+    storage: LongArray?,
+    quickAccess: List<String>,
+    onOpen: (String) -> Unit,
+    onShizukuAction: () -> Unit,
+    onShowGuide: () -> Unit,
+    onGrantLocal: () -> Unit,
+    onRemoveQuick: (String) -> Unit,
+    onAddQuick: () -> Unit,
+    onOpenCleaner: (CleanMode) -> Unit,
+    style: HomeStyle = HomeStyle.Cards,
+) {
+    if (style == HomeStyle.Classic) {
+        ClassicHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onGrantLocal, onRemoveQuick, onAddQuick, onOpenCleaner)
+    } else {
+        CardsHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onShizukuAction, onShowGuide, onGrantLocal, onRemoveQuick, onAddQuick, onOpenCleaner)
+    }
+}
+
+@Composable
+private fun CardsHome(
     rootPath: String,
     shizuku: ShizukuStatus,
     localAccess: Boolean,
@@ -504,6 +534,185 @@ private fun InfoCard(icon: ImageVector, title: String, body: String, action: Str
             }
             Spacer(Modifier.width(8.dp))
             Button(onClick = onAction) { Text(action) }
+        }
+    }
+}
+
+// ---------- classic home: sectioned list ----------
+
+@Composable
+private fun ClassicSection(title: String, trailing: (@Composable () -> Unit)? = null) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 12.dp, top = 18.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+        trailing?.invoke()
+    }
+}
+
+@Composable
+private fun ClassicTile(
+    icon: ImageVector,
+    tint: Color,
+    title: String,
+    subtitle: String?,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(tint.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center,
+        ) { Icon(icon, null, tint = tint) }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ClassicHome(
+    rootPath: String,
+    shizuku: ShizukuStatus,
+    localAccess: Boolean,
+    storage: LongArray?,
+    quickAccess: List<String>,
+    onOpen: (String) -> Unit,
+    onGrantLocal: () -> Unit,
+    onRemoveQuick: (String) -> Unit,
+    onAddQuick: () -> Unit,
+    onOpenCleaner: (CleanMode) -> Unit,
+) {
+    var editing by rememberSaveable { mutableStateOf(false) }
+    val scheme = MaterialTheme.colorScheme
+    val total = storage?.getOrNull(0) ?: 0L
+    val free = storage?.getOrNull(1) ?: 0L
+    val blue = Color(0xFF2F7DE1)
+    val red = Color(0xFFE5484D)
+    val teal = Color(0xFF1F9E8F)
+    val green = Color(0xFF4C9A2A)
+    val purple = Color(0xFF7C6BE0)
+    val amber = Color(0xFFD98A1B)
+
+    LazyColumn(contentPadding = PaddingValues(top = 0.dp, bottom = 32.dp)) {
+        if (!localAccess && shizuku != ShizukuStatus.Ready) {
+            item(key = "local") {
+                Spacer(Modifier.height(8.dp))
+                InfoCard(
+                    icon = Icons.Filled.LockOpen,
+                    title = "دسترسی به حافظه",
+                    body = "برای مرور پوشه‌های معمولی بدون Shizuku، اجازه‌ی دسترسی به همه‌ی فایل‌ها را بدهید.",
+                    action = "اجازه دادن",
+                    onAction = onGrantLocal,
+                )
+            }
+        }
+
+        item(key = "filesTitle") { ClassicSection("فایل‌ها") }
+        item(key = "storage") {
+            ClassicTile(
+                Icons.Filled.PhoneAndroid, blue, "حافظه داخلی",
+                (if (total > 0) "${formatSize(total)} • ${formatSize(free)} خالی\n" else "") + rootPath,
+                Modifier.fillMaxWidth(),
+            ) { onOpen(rootPath) }
+        }
+        item(key = "data") {
+            ClassicTile(
+                Icons.Filled.FolderSpecial, amber, "Android/data",
+                "دیتای برنامه‌ها و بازی‌ها",
+                Modifier.fillMaxWidth(),
+            ) { onOpen("$rootPath/Android/data") }
+        }
+
+        item(key = "quickTitle") {
+            ClassicSection("دسترسی سریع") {
+                TextButton(onClick = { editing = !editing }) { Text(if (editing) "تمام" else "ویرایش") }
+            }
+        }
+        val tiles: List<String?> = quickAccess + listOf(null)
+        items(tiles.chunked(2), key = { row -> "q" + row.joinToString("|") { it ?: "+add" } }) { row ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                row.forEach { path ->
+                    if (path == null) {
+                        AddTile(Modifier.weight(1f), onAddQuick)
+                    } else {
+                        QuickTile(
+                            path = path,
+                            rootPath = rootPath,
+                            editing = editing,
+                            modifier = Modifier.weight(1f),
+                            onClick = { if (editing) onRemoveQuick(path) else onOpen(path) },
+                            onLongClick = { editing = true },
+                        )
+                    }
+                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+        if (editing) {
+            item(key = "editHint") {
+                Text(
+                    "برای حذف، روی پوشه بزنید.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = scheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+                )
+            }
+        }
+
+        item(key = "mediaTitle") { ClassicSection("رسانه") }
+        item(key = "media1") {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+                ClassicTile(Icons.Filled.Image, blue, "تصاویر", "Pictures", Modifier.weight(1f)) { onOpen("$rootPath/Pictures") }
+                ClassicTile(Icons.Filled.Movie, red, "ویدیوها", "Movies", Modifier.weight(1f)) { onOpen("$rootPath/Movies") }
+            }
+        }
+        item(key = "media2") {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+                ClassicTile(Icons.Filled.MusicNote, teal, "موسیقی", "Music", Modifier.weight(1f)) { onOpen("$rootPath/Music") }
+                ClassicTile(Icons.Filled.Android, green, "برنامه‌ها", "فایل‌های نصبی در همه‌ی حافظه", Modifier.weight(1f)) {
+                    onOpenCleaner(CleanMode.Apks)
+                }
+            }
+        }
+
+        item(key = "toolsTitle") { ClassicSection("ابزارها") }
+        item(key = "tools") {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+                ClassicTile(Icons.Filled.SdStorage, purple, "فایل‌های بزرگ", "پاکسازی فایل‌های حجیم", Modifier.weight(1f)) {
+                    onOpenCleaner(CleanMode.Large)
+                }
+                ClassicTile(Icons.Filled.FileCopy, purple, "فایل‌های تکراری", "حذف کپی‌های اضافه", Modifier.weight(1f)) {
+                    onOpenCleaner(CleanMode.Duplicates)
+                }
+            }
         }
     }
 }

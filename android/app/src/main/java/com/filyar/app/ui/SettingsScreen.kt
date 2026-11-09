@@ -1,5 +1,6 @@
 package com.filyar.app.ui
 
+import com.filyar.app.core.HomeStyle
 import com.filyar.app.ui.theme.Filyar
 import com.filyar.app.ui.theme.AccentColors
 import com.filyar.app.core.FolderModel
@@ -83,6 +84,11 @@ fun SettingsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onBack: ()
                 options = listOf(ThemeMode.System to "هماهنگ با سیستم", ThemeMode.Light to "روشن", ThemeMode.Dark to "تیره"),
                 selected = vp.theme,
             ) { m -> vm.updateView { it.copy(theme = m) } }
+            Label("چیدمان صفحه‌ی اصلی")
+            Chips(
+                options = listOf(HomeStyle.Cards to "کارتی (فعلی)", HomeStyle.Classic to "کلاسیک"),
+                selected = vp.homeStyle,
+            ) { h -> vm.updateView { it.copy(homeStyle = h) } }
             val dynamicOn = vp.dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
             Label(if (dynamicOn) "رنگ اصلی (با رنگ پویا خاموش می‌شود)" else "رنگ اصلی")
             AccentPicker(selected = vp.accent, enabled = !dynamicOn) { a -> vm.updateView { it.copy(accent = a) } }
