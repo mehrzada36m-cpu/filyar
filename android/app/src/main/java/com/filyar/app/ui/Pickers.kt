@@ -160,7 +160,7 @@ fun FolderStyleDialog(
                                 .size(46.dp)
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(if (sel) tint.copy(alpha = 0.2f) else Color.Transparent)
-                                .border(if (sel) 2.dp else 0.dp, if (sel) tint else Color.Transparent, RoundedCornerShape(14.dp))
+                                .then(if (sel) Modifier.border(2.dp, tint, RoundedCornerShape(14.dp)) else Modifier)
                                 .clickable { icon = key },
                             contentAlignment = Alignment.Center,
                         ) {
@@ -181,9 +181,8 @@ fun FolderStyleDialog(
                                     .size(34.dp)
                                     .clip(CircleShape)
                                     .background(c)
-                                    .border(
-                                        BorderStroke(if (i == color) 3.dp else 0.dp, MaterialTheme.colorScheme.onSurface),
-                                        CircleShape,
+                                    .then(
+                                        if (i == color) Modifier.border(BorderStroke(3.dp, MaterialTheme.colorScheme.onSurface), CircleShape) else Modifier,
                                     )
                                     .clickable { color = i },
                                 contentAlignment = Alignment.Center,

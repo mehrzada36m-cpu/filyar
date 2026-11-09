@@ -1,5 +1,6 @@
 package com.filyar.app.ui
 
+import androidx.compose.foundation.clickable
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -239,6 +240,7 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
                     onRefresh = { vm.reload() },
                     onGuide = { dlg = Dlg.Guide },
                     onSettings = onOpenSettings,
+                    onShizuku = shizukuAction,
                 )
             }
         },
@@ -443,11 +445,9 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
 }
 
 private fun statusText(s: ShizukuStatus) = when (s) {
-    ShizukuStatus.Ready -> "Shizuku فعال • دسترسی کامل"
-    ShizukuStatus.Connecting -> "در حال اتصال به Shizuku…"
-    ShizukuStatus.NoPermission -> "Shizuku منتظر اجازه است"
-    ShizukuStatus.NotRunning -> "Shizuku خاموش است"
-    ShizukuStatus.NotInstalled -> "Shizuku نصب نیست"
+    ShizukuStatus.Ready -> "Shizuku فعال"
+    ShizukuStatus.Connecting -> "Shizuku در حال اتصال…"
+    else -> "Shizuku غیرفعال"
 }
 
 private fun countText(items: List<RemoteFile>): String {
@@ -477,6 +477,7 @@ private fun MainTopBar(
     onRefresh: () -> Unit,
     onGuide: () -> Unit,
     onSettings: () -> Unit,
+    onShizuku: () -> Unit,
 ) {
     var moreOpen by remember { mutableStateOf(false) }
     TopAppBar(
@@ -499,7 +500,12 @@ private fun MainTopBar(
                         )
                         Spacer(Modifier.width(6.dp))
                     }
-                    Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.clickable(enabled = atHome && !shizukuReady, onClick = onShizuku),
+                    )
                 }
             }
         },

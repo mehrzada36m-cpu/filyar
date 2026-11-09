@@ -93,10 +93,7 @@ fun HomeDashboard(
     var cleanerOpen by rememberSaveable { mutableStateOf(false) }
 
     LazyColumn(contentPadding = PaddingValues(top = 4.dp, bottom = 32.dp)) {
-        // Once Shizuku is connected the card has nothing to ask for, so it goes away.
-        if (shizuku != ShizukuStatus.Ready) {
-            item(key = "shizuku") { ShizukuHero(shizuku, onShizukuAction, onShowGuide) }
-        }
+        // Shizuku's state lives in the header text now; tapping it when it is off starts the setup.
 
         if (!localAccess && shizuku != ShizukuStatus.Ready) {
             item(key = "local") {

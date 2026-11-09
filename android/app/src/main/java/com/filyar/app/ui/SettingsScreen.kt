@@ -1,5 +1,22 @@
 package com.filyar.app.ui
 
+import com.filyar.app.ui.theme.Filyar
+import com.filyar.app.ui.theme.AccentColors
+import com.filyar.app.core.FolderModel
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
@@ -66,6 +83,9 @@ fun SettingsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onBack: ()
                 options = listOf(ThemeMode.System to "هماهنگ با سیستم", ThemeMode.Light to "روشن", ThemeMode.Dark to "تیره"),
                 selected = vp.theme,
             ) { m -> vm.updateView { it.copy(theme = m) } }
+            val dynamicOn = vp.dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+            Label(if (dynamicOn) "رنگ اصلی (با رنگ پویا خاموش می‌شود)" else "رنگ اصلی")
+            AccentPicker(selected = vp.accent, enabled = !dynamicOn) { a -> vm.updateView { it.copy(accent = a) } }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 SwitchRow(
                     "رنگ پویا",
@@ -81,6 +101,8 @@ fun SettingsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onBack: ()
                 options = listOf(ItemSize.Compact to "فشرده", ItemSize.Standard to "استاندارد", ItemSize.Large to "بزرگ"),
                 selected = vp.itemSize,
             ) { sz -> vm.updateView { it.copy(itemSize = sz) } }
+            Label("مدل پوشه")
+            FolderModelPicker(selected = vp.folderModel) { m -> vm.updateView { it.copy(folderModel = m) } }
             Label("حالت نمایش")
             Chips(
                 options = listOf(false to "فهرستی", true to "شبکه‌ای"),
@@ -170,5 +192,69 @@ private fun SwitchRow(title: String, body: String?, checked: Boolean, onChange: 
             }
         }
         Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+@Composable
+private fun AccentPicker(selected: Int, enabled: Boolean, onSelect: (Int) -> Unit) {
+    val options = listOf(-1) + AccentColors.indices.toList()
+    Row(
+        Modifier
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        options.forEach { i ->
+            val c = if (i < 0) Color(0xFF0F766E) else AccentColors[i]
+            val sel = i == selected
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(c.copy(alpha = if (enabled) 1f else 0.4f))
+                    .then(if (sel) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier)
+                    .clickable(enabled = enabled) { onSelect(i) },
+                contentAlignment = Alignment.Center,
+            ) {
+                if (sel) Icon(Icons.Filled.Check, null, tint = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+private fun FolderModelPicker(selected: FolderModel, onSelect: (FolderModel) -> Unit) {
+    val items = listOf(
+        FolderModel.Tile to "کاشی",
+        FolderModel.Circle to "دایره",
+        FolderModel.Plain to "ساده",
+        FolderModel.Outline to "خطی",
+    )
+    val tint = Filyar.tokens.folder
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items.forEach { (m, label) ->
+            val sel = m == selected
+            val shape = RoundedCornerShape(16.dp)
+            Column(
+                Modifier
+                    .weight(1f)
+                    .clip(shape)
+                    .then(if (sel) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape) else Modifier)
+                    .clickable { onSelect(m) }
+                    .padding(vertical = 10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                FolderFrame(m, tint, 48.dp) {
+                    Icon(Icons.Filled.Folder, null, tint = tint, modifier = Modifier.size(if (m == FolderModel.Plain) 44.dp else 27.dp))
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(label, style = MaterialTheme.typography.labelMedium)
+            }
+        }
     }
 }

@@ -1,5 +1,6 @@
 package com.filyar.app.ui.theme
 
+import androidx.compose.ui.graphics.lerp
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -201,20 +202,55 @@ fun isDarkTheme(mode: ThemeMode): Boolean = when (mode) {
     ThemeMode.Dark -> true
 }
 
+/** Accent colours the user can pick; index -1 means the default teal. */
+val AccentColors = listOf(
+    Color(0xFF1D4ED8), // blue
+    Color(0xFF6D28D9), // violet
+    Color(0xFFBE185D), // pink
+    Color(0xFFB91C1C), // red
+    Color(0xFFC2410C), // orange
+    Color(0xFF15803D), // green
+    Color(0xFF0E7490), // cyan
+    Color(0xFF57534E), // stone
+)
+
+private fun accentScheme(base: ColorScheme, accent: Color, dark: Boolean): ColorScheme =
+    if (dark) {
+        base.copy(
+            primary = lerp(accent, Color.White, 0.5f),
+            onPrimary = lerp(accent, Color.Black, 0.75f),
+            primaryContainer = lerp(accent, Color.Black, 0.55f),
+            onPrimaryContainer = lerp(accent, Color.White, 0.82f),
+            secondaryContainer = lerp(accent, Color.Black, 0.68f),
+            onSecondaryContainer = lerp(accent, Color.White, 0.85f),
+        )
+    } else {
+        base.copy(
+            primary = accent,
+            onPrimary = Color.White,
+            primaryContainer = lerp(accent, Color.White, 0.84f),
+            onPrimaryContainer = lerp(accent, Color.Black, 0.65f),
+            secondaryContainer = lerp(accent, Color.White, 0.88f),
+            onSecondaryContainer = lerp(accent, Color.Black, 0.65f),
+        )
+    }
+
 @Composable
-fun FilyarTheme(mode: ThemeMode = ThemeMode.System, dynamic: Boolean = false, content: @Composable () -> Unit) {
+fun FilyarTheme(mode: ThemeMode = ThemeMode.System, dynamic: Boolean = false, accent: Int = -1, content: @Composable () -> Unit) {
     val dark = isDarkTheme(mode)
     val context = LocalContext.current
     val useDynamic = dynamic && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val accentColor = if (useDynamic) null else AccentColors.getOrNull(accent)
     val scheme = when {
         useDynamic && dark -> dynamicDarkColorScheme(context)
         useDynamic -> dynamicLightColorScheme(context)
+        accentColor != null -> accentScheme(if (dark) DarkColors else LightColors, accentColor, dark)
         dark -> DarkColors
         else -> LightColors
     }
     val base = if (dark) DarkTokens else LightTokens
     // With wallpaper colours, folders and the header card follow the wallpaper palette too.
-    val tokens = if (!useDynamic) base else base.copy(
+    val tokens = if (!useDynamic && accentColor == null) base else base.copy(
         folder = scheme.primary,
         heroBrush = Brush.linearGradient(listOf(scheme.primaryContainer, scheme.secondaryContainer, scheme.tertiaryContainer)),
         onHero = scheme.onPrimaryContainer,

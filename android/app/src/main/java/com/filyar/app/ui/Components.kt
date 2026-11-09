@@ -1,5 +1,9 @@
 package com.filyar.app.ui
 
+import com.filyar.app.core.FolderModel
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.border
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
@@ -103,16 +107,34 @@ val ItemSize.gridIcon: Dp
         ItemSize.Large -> 88.dp
     }
 
-/** A folder's icon: the user's choice, else the owning app's icon, else one matched to its name. */
+/** The shape behind a folder icon, chosen in settings. */
+@Composable
+fun FolderFrame(model: FolderModel, tint: Color, size: Dp, modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
+    val shape = if (model == FolderModel.Circle) CircleShape else RoundedCornerShape(size * 0.3f)
+    val base = modifier.size(size)
+    val framed = when (model) {
+        FolderModel.Plain -> base
+        FolderModel.Outline -> base.clip(shape).border(1.5.dp, tint.copy(alpha = 0.7f), shape)
+        else -> base.clip(shape).background(tint.copy(alpha = 0.14f))
+    }
+    Box(framed, contentAlignment = Alignment.Center, content = content)
+}
+
+/**
+ * A folder's icon: the user's choice, else one matched to its name. When the folder belongs to an
+ * installed app, that app's icon is added as a small badge in the corner so the folder still reads
+ * as a folder.
+ */
 @Composable
 fun FolderGlyph(path: String, name: String, size: Dp, modifier: Modifier = Modifier) {
     val custom = LocalFolderStyles.current[path]
-    val appIcons = LocalViewPrefs.current.appFolderIcons
+    val prefs = LocalViewPrefs.current
+    val appIcons = prefs.appFolderIcons
     val context = LocalContext.current
     val customIcon = custom?.icon?.let { FolderIcons.byKey(it) }
     val builtin = FolderIcons.builtinFor(name)
     val tryApp = customIcon == null && builtin == null && appIcons
-    val px = with(LocalDensity.current) { (size * 0.66f).roundToPx() }
+    val px = with(LocalDensity.current) { (size * 0.42f).roundToPx() }
     var app by remember(name, px, tryApp) {
         mutableStateOf(if (tryApp) AppIcons.cached(name, px)?.asImageBitmap() else null)
     }
@@ -122,19 +144,28 @@ fun FolderGlyph(path: String, name: String, size: Dp, modifier: Modifier = Modif
         }
     }
     val tint = custom?.color?.let { FolderIcons.colorAt(it) } ?: Filyar.tokens.folder
-    val icon = customIcon ?: builtin ?: (if (appIcons) FolderIcons.appFallbackFor(name) else null) ?: Icons.Filled.Folder
-    Box(
-        modifier
-            .size(size)
-            .clip(RoundedCornerShape(size * 0.3f))
-            .background(tint.copy(alpha = 0.14f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        val a = app
+    val a = app
+    val icon = customIcon ?: builtin
+        ?: (if (a == null && appIcons) FolderIcons.appFallbackFor(name) else null)
+        ?: Icons.Filled.Folder
+    val plain = prefs.folderModel == FolderModel.Plain
+    Box(modifier.size(size)) {
+        FolderFrame(prefs.folderModel, tint, size) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size * (if (plain) 0.92f else 0.56f)))
+        }
         if (a != null) {
-            Image(a, contentDescription = null, modifier = Modifier.size(size * 0.66f))
-        } else {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size * 0.52f))
+            val badge = RoundedCornerShape(size * 0.12f)
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset(size * 0.08f, size * 0.08f)
+                    .size(size * 0.44f)
+                    .clip(badge)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(size * 0.03f),
+            ) {
+                Image(a, contentDescription = null, modifier = Modifier.fillMaxSize().clip(badge))
+            }
         }
     }
 }

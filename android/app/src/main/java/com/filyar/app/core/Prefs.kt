@@ -11,6 +11,9 @@ enum class ItemSize { Compact, Standard, Large }
 enum class ThemeMode { System, Light, Dark }
 enum class LongPressAction { Icon, Select }
 
+/** How a folder is drawn: rounded tile, circle, bare icon, or outlined tile. */
+enum class FolderModel { Tile, Circle, Plain, Outline }
+
 data class ViewPrefs(
     val sort: SortBy = SortBy.Name,
     val ascending: Boolean = true,
@@ -23,6 +26,9 @@ data class ViewPrefs(
     val theme: ThemeMode = ThemeMode.System,
     val dynamicColor: Boolean = false,
     val folderLongPress: LongPressAction = LongPressAction.Icon,
+    /** Index into the accent palette; -1 keeps the default teal. */
+    val accent: Int = -1,
+    val folderModel: FolderModel = FolderModel.Tile,
 )
 
 /** A user-chosen look for one folder: icon key and colour index (-1 = default colour). */
@@ -48,6 +54,8 @@ class Prefs(context: Context) {
             theme = enumPref("theme", ThemeMode.System),
             dynamicColor = sp.getBoolean("dynamicColor", false),
             folderLongPress = enumPref("folderLongPress", LongPressAction.Icon),
+            accent = sp.getInt("accent", -1),
+            folderModel = enumPref("folderModel", FolderModel.Tile),
         )
     )
     val view: StateFlow<ViewPrefs> = _view.asStateFlow()
@@ -73,6 +81,8 @@ class Prefs(context: Context) {
             .putString("theme", v.theme.name)
             .putBoolean("dynamicColor", v.dynamicColor)
             .putString("folderLongPress", v.folderLongPress.name)
+            .putInt("accent", v.accent)
+            .putString("folderModel", v.folderModel.name)
             .apply()
     }
 
