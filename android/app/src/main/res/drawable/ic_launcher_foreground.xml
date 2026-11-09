@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- folder back -->
+    <path
+        android:fillColor="@color/icon_fg"
+        android:pathData="M32,38 C32,35.8 33.8,34 36,34 L48,34 L53,39 L72,39 C74.2,39 76,40.8 76,43 L76,70 C76,72.2 74.2,74 72,74 L36,74 C33.8,74 32,72.2 32,70 Z" />
+    <!-- folder front -->
+    <path
+        android:fillColor="#0F766E"
+        android:pathData="M32,47 C32,44.8 33.8,43 36,43 L72,43 C74.2,43 76,44.8 76,47 L76,70 C76,72.2 74.2,74 72,74 L36,74 C33.8,74 32,72.2 32,70 Z" />
+    <!-- bolt -->
+    <path
+        android:fillColor="@color/icon_accent"
+        android:pathData="M56,48 L46,61 L53,61 L51,70 L62,56 L55,56 Z" />
+</vector>

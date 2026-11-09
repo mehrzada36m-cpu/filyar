@@ -1,0 +1,53 @@
+name: Build Filyar APK
+
+on:
+  push:
+    paths:
+      - "android/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build APK
+        working-directory: android
+        run: gradle assembleRelease --no-daemon --console=plain
+
+      - name: Name APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk "Filyar-1.0.${{ github.run_number }}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Filyar-1.0.${{ github.run_number }}
+          path: Filyar-*.apk
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: فایل‌یار ۱.۰.${{ github.run_number }}
+          body: |
+            فایل نصبی را از بخش Assets پایین همین صفحه دانلود و روی گوشی نصب کنید.
+            نسخه‌های جدید روی نسخه‌ی قبلی نصب می‌شوند.
+          files: Filyar-*.apk
+          make_latest: true

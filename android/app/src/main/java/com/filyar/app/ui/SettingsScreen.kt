@@ -1,0 +1,174 @@
+package com.filyar.app.ui
+
+import android.os.Build
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.filyar.app.core.ItemSize
+import com.filyar.app.core.LongPressAction
+import com.filyar.app.core.ThemeMode
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onBack: () -> Unit) {
+    val vp by vm.viewPrefs.collectAsStateWithLifecycle()
+    BackHandler(onBack = onBack)
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbar) },
+        topBar = {
+            TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت") } },
+                title = { Text("تنظیمات", style = MaterialTheme.typography.titleLarge) },
+            )
+        },
+    ) { pad ->
+        Column(
+            Modifier
+                .padding(pad)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 32.dp),
+        ) {
+            Group("ظاهر برنامه")
+            Label("تم")
+            Chips(
+                options = listOf(ThemeMode.System to "هماهنگ با سیستم", ThemeMode.Light to "روشن", ThemeMode.Dark to "تیره"),
+                selected = vp.theme,
+            ) { m -> vm.updateView { it.copy(theme = m) } }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                SwitchRow(
+                    "رنگ پویا",
+                    "رنگ‌ها از پس‌زمینه‌ی گوشی گرفته می‌شود",
+                    vp.dynamicColor,
+                ) { v -> vm.updateView { it.copy(dynamicColor = v) } }
+            }
+
+            HorizontalDivider(Modifier.padding(vertical = 12.dp, horizontal = 20.dp))
+            Group("فایل‌ها و پوشه‌ها")
+            Label("اندازه‌ی نمایش")
+            Chips(
+                options = listOf(ItemSize.Compact to "فشرده", ItemSize.Standard to "استاندارد", ItemSize.Large to "بزرگ"),
+                selected = vp.itemSize,
+            ) { sz -> vm.updateView { it.copy(itemSize = sz) } }
+            Label("حالت نمایش")
+            Chips(
+                options = listOf(false to "فهرستی", true to "شبکه‌ای"),
+                selected = vp.grid,
+            ) { g -> vm.updateView { it.copy(grid = g) } }
+            SwitchRow("پیش‌نمایش تصویر و ویدیو", "نمایش بندانگشتی فایل‌های رسانه‌ای", vp.previews) { v ->
+                vm.updateView { it.copy(previews = v) }
+            }
+            SwitchRow("آیکون برنامه برای پوشه‌ها", "مثلاً آیکون تلگرام برای پوشه‌ی Telegram", vp.appFolderIcons) { v ->
+                vm.updateView { it.copy(appFolderIcons = v) }
+            }
+            SwitchRow("اول پوشه‌ها", "پوشه‌ها بالای فایل‌ها بیایند", vp.foldersFirst) { v ->
+                vm.updateView { it.copy(foldersFirst = v) }
+            }
+            SwitchRow("نمایش فایل‌های مخفی", null, vp.showHidden) { v ->
+                vm.updateView { it.copy(showHidden = v) }
+            }
+            Label("نگه داشتن انگشت روی پوشه")
+            Chips(
+                options = listOf(LongPressAction.Icon to "تغییر آیکون", LongPressAction.Select to "انتخاب"),
+                selected = vp.folderLongPress,
+            ) { a -> vm.updateView { it.copy(folderLongPress = a) } }
+
+            HorizontalDivider(Modifier.padding(vertical = 12.dp, horizontal = 20.dp))
+            Group("بازنشانی")
+            Row(
+                Modifier.padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(onClick = vm::resetQuickAccess, modifier = Modifier.weight(1f)) { Text("دسترسی سریع") }
+                OutlinedButton(onClick = vm::clearFolderStyles, modifier = Modifier.weight(1f)) { Text("آیکون پوشه‌ها") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Group(title: String) {
+    Text(
+        title,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+    )
+}
+
+@Composable
+private fun Label(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp),
+    )
+}
+
+@Composable
+private fun <T> Chips(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        options.forEach { (value, label) ->
+            FilterChip(
+                selected = value == selected,
+                onClick = { onSelect(value) },
+                label = { Text(label) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SwitchRow(title: String, body: String?, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            if (body != null) {
+                Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
+}

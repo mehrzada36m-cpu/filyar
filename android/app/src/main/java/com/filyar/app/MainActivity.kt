@@ -1,0 +1,116 @@
+package com.filyar.app
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.filyar.app.ui.BrowserScreen
+import com.filyar.app.ui.BrowserViewModel
+import com.filyar.app.ui.CleanScreen
+import com.filyar.app.ui.EditorScreen
+import com.filyar.app.ui.LocalFolderStyles
+import com.filyar.app.ui.LocalViewPrefs
+import com.filyar.app.ui.SettingsScreen
+import com.filyar.app.ui.ImageViewerScreen
+import com.filyar.app.ui.ProgressDialog
+import com.filyar.app.ui.UiEvent
+import com.filyar.app.ui.theme.FilyarTheme
+
+private sealed interface Screen {
+    data object Browser : Screen
+    data class Editor(val file: RemoteFile) : Screen
+    data class Viewer(val file: RemoteFile) : Screen
+    data object Settings : Screen
+    data object Clean : Screen
+}
+
+class MainActivity : ComponentActivity() {
+    private val vm: BrowserViewModel by viewModels()
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
+        super.onCreate(savedInstanceState)
+        setContent {
+            val vp by vm.viewPrefs.collectAsStateWithLifecycle()
+            val styles by vm.folderStyles.collectAsStateWithLifecycle()
+            FilyarTheme(vp.theme, vp.dynamicColor) {
+                CompositionLocalProvider(
+                    LocalLayoutDirection provides LayoutDirection.Rtl,
+                    LocalViewPrefs provides vp,
+                    LocalFolderStyles provides styles,
+                ) {
+                    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                        AppRoot(vm)
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        vm.onResume()
+    }
+}
+
+@Composable
+private fun AppRoot(vm: BrowserViewModel) {
+    var base by remember { mutableStateOf<Screen>(Screen.Browser) }
+    val clean by vm.clean.collectAsStateWithLifecycle()
+    val screen: Screen = if (base == Screen.Browser && clean.mode != null) Screen.Clean else base
+    val snackbar = remember { SnackbarHostState() }
+    val progress by vm.progress.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        vm.events.collect {
+            base = when (it) {
+                is UiEvent.Edit -> Screen.Editor(it.file)
+                is UiEvent.ViewImage -> Screen.Viewer(it.file)
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        vm.messages.collect {
+            snackbar.currentSnackbarData?.dismiss()
+            snackbar.showSnackbar(it)
+        }
+    }
+
+    AnimatedContent(
+        targetState = screen,
+        transitionSpec = { (fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 14 }) togetherWith fadeOut(tween(140)) },
+        label = "screen",
+    ) { s ->
+        when (s) {
+            Screen.Browser -> BrowserScreen(vm, snackbar) { base = Screen.Settings }
+            Screen.Clean -> CleanScreen(vm, snackbar)
+            Screen.Settings -> SettingsScreen(vm, snackbar) { base = Screen.Browser }
+            is Screen.Editor -> EditorScreen(s.file, vm, snackbar) { base = Screen.Browser }
+            is Screen.Viewer -> ImageViewerScreen(s.file, vm) { base = Screen.Browser }
+        }
+    }
+
+    progress?.let { ProgressDialog(it, onCancel = vm::cancelOp) }
+}
