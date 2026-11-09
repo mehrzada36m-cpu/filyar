@@ -141,6 +141,7 @@ private sealed interface Dlg {
     data class Compress(val items: List<RemoteFile>) : Dlg
     data class Extract(val f: RemoteFile) : Dlg
     data object AddQuick : Dlg
+    data class QuickStyle(val path: String) : Dlg
     data class FolderStyleDlg(val f: RemoteFile) : Dlg
 }
 
@@ -302,6 +303,7 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
                     onGrantLocal = grantLocal,
                     onRemoveQuick = { vm.removeQuickAccess(it) },
                     onAddQuick = { dlg = Dlg.AddQuick },
+                    onCustomizeQuick = { dlg = Dlg.QuickStyle(it) },
                     onOpenCleaner = { vm.openClean(it) },
                     style = vp.homeStyle,
                 )
@@ -442,6 +444,15 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
             dlg = null
             vm.addQuickAccess(it)
         }
+        is Dlg.QuickStyle -> FolderStyleDialog(
+            name = d.path.substringAfterLast('/'),
+            current = folderStyles[d.path],
+            onDismiss = { dlg = null },
+            onSave = {
+                dlg = null
+                vm.setFolderStyle(d.path, it)
+            },
+        )
         is Dlg.FolderStyleDlg -> FolderStyleDialog(
             name = d.f.name,
             current = folderStyles[d.f.path],

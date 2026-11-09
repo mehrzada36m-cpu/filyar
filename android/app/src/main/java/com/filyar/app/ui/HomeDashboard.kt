@@ -1,5 +1,9 @@
 package com.filyar.app.ui
 
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.foundation.clickable
 import com.filyar.app.core.HomeStyle
 import androidx.compose.ui.graphics.Color
@@ -95,13 +99,14 @@ fun HomeDashboard(
     onGrantLocal: () -> Unit,
     onRemoveQuick: (String) -> Unit,
     onAddQuick: () -> Unit,
+    onCustomizeQuick: (String) -> Unit,
     onOpenCleaner: (CleanMode) -> Unit,
     style: HomeStyle = HomeStyle.Cards,
 ) {
     if (style == HomeStyle.Classic) {
-        ClassicHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onGrantLocal, onRemoveQuick, onAddQuick, onOpenCleaner)
+        ClassicHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onGrantLocal, onRemoveQuick, onAddQuick, onCustomizeQuick, onOpenCleaner)
     } else {
-        CardsHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onShizukuAction, onShowGuide, onGrantLocal, onRemoveQuick, onAddQuick, onOpenCleaner)
+        CardsHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onShizukuAction, onShowGuide, onGrantLocal, onRemoveQuick, onAddQuick, onCustomizeQuick, onOpenCleaner)
     }
 }
 
@@ -118,9 +123,9 @@ private fun CardsHome(
     onGrantLocal: () -> Unit,
     onRemoveQuick: (String) -> Unit,
     onAddQuick: () -> Unit,
+    onCustomizeQuick: (String) -> Unit,
     onOpenCleaner: (CleanMode) -> Unit,
 ) {
-    var editing by rememberSaveable { mutableStateOf(false) }
     var cleanerOpen by rememberSaveable { mutableStateOf(false) }
 
     LazyColumn(contentPadding = PaddingValues(top = 4.dp, bottom = 32.dp)) {
@@ -159,11 +164,10 @@ private fun CardsHome(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SectionTitle("دسترسی سریع", Modifier.weight(1f))
-                TextButton(onClick = { editing = !editing }) { Text(if (editing) "تمام" else "ویرایش") }
+                IconButton(onClick = onAddQuick) { Icon(Icons.Filled.Add, "افزودن پوشه") }
             }
         }
-        val tiles: List<String?> = quickAccess + listOf(null)
-        items(tiles.chunked(2), key = { row -> row.joinToString("|") { it ?: "+add" } }) { row ->
+        items(quickAccess.chunked(2), key = { row -> "q" + row.joinToString("|") }) { row ->
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -171,31 +175,25 @@ private fun CardsHome(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 row.forEach { path ->
-                    if (path == null) {
-                        AddTile(Modifier.weight(1f), onAddQuick)
-                    } else {
-                        QuickTile(
-                            path = path,
-                            rootPath = rootPath,
-                            editing = editing,
-                            modifier = Modifier.weight(1f),
-                            onClick = { if (editing) onRemoveQuick(path) else onOpen(path) },
-                            onLongClick = { editing = true },
-                        )
-                    }
+                    QuickTile(
+                        path = path,
+                        rootPath = rootPath,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onOpen(path) },
+                        onCustomize = { onCustomizeQuick(path) },
+                        onRemove = { onRemoveQuick(path) },
+                    )
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
-        if (editing) {
-            item(key = "editHint") {
-                Text(
-                    "برای حذف، روی پوشه بزنید. برای افزودن، «افزودن پوشه» را بزنید یا در هر پوشه از منوی سه‌نقطه «افزودن به دسترسی سریع» را انتخاب کنید.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
-                )
-            }
+        item(key = "quickHint") {
+            Text(
+                "برای تغییر آیکون، رنگ و شکل یا حذف، روی هر پوشه نگه دارید.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+            )
         }
     }
 }
@@ -452,11 +450,12 @@ private fun Modifier.combinedClickableCompat(onClick: () -> Unit) = this.combine
 private fun QuickTile(
     path: String,
     rootPath: String,
-    editing: Boolean,
     modifier: Modifier,
     onClick: () -> Unit,
-    onLongClick: () -> Unit,
+    onCustomize: () -> Unit,
+    onRemove: () -> Unit,
 ) {
+    var menu by remember { mutableStateOf(false) }
     val rel = path.removePrefix(rootPath).trimStart('/')
     val name = path.substringAfterLast('/')
     val label = friendlyNames[rel] ?: name
@@ -465,7 +464,7 @@ private fun QuickTile(
         modifier
             .clip(RoundedCornerShape(22.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+            .combinedClickable(onClick = onClick, onLongClick = { menu = true }),
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             FolderGlyph(path, name, 40.dp)
@@ -480,38 +479,24 @@ private fun QuickTile(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            AnimatedVisibility(editing) {
-                Box(
-                    Modifier
-                        .size(26.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.errorContainer),
-                    contentAlignment = Alignment.Center,
-                ) { Icon(Icons.Filled.Close, "حذف", tint = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.size(16.dp)) }
-            }
         }
-    }
-}
-
-@Composable
-private fun AddTile(modifier: Modifier, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0f),
-        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = modifier,
-    ) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(13.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Filled.Add, null, tint = MaterialTheme.colorScheme.onPrimaryContainer) }
-            Spacer(Modifier.width(10.dp))
-            Text("افزودن پوشه", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenuItem(
+                text = { Text("تغییر آیکون، رنگ و شکل") },
+                leadingIcon = { Icon(Icons.Filled.Palette, null) },
+                onClick = {
+                    menu = false
+                    onCustomize()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text("حذف از دسترسی سریع") },
+                leadingIcon = { Icon(Icons.Filled.Close, null) },
+                onClick = {
+                    menu = false
+                    onRemove()
+                },
+            )
         }
     }
 }
@@ -603,9 +588,9 @@ private fun ClassicHome(
     onGrantLocal: () -> Unit,
     onRemoveQuick: (String) -> Unit,
     onAddQuick: () -> Unit,
+    onCustomizeQuick: (String) -> Unit,
     onOpenCleaner: (CleanMode) -> Unit,
 ) {
-    var editing by rememberSaveable { mutableStateOf(false) }
     val scheme = MaterialTheme.colorScheme
     val total = storage?.getOrNull(0) ?: 0L
     val free = storage?.getOrNull(1) ?: 0L
@@ -648,43 +633,36 @@ private fun ClassicHome(
 
         item(key = "quickTitle") {
             ClassicSection("دسترسی سریع") {
-                TextButton(onClick = { editing = !editing }) { Text(if (editing) "تمام" else "ویرایش") }
+                IconButton(onClick = onAddQuick) { Icon(Icons.Filled.Add, "افزودن پوشه") }
             }
         }
-        val tiles: List<String?> = quickAccess + listOf(null)
-        items(tiles.chunked(2), key = { row -> "q" + row.joinToString("|") { it ?: "+add" } }) { row ->
+        items(quickAccess.chunked(2), key = { row -> "q" + row.joinToString("|") }) { row ->
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 4.dp),
+                    .padding(horizontal = 14.dp, vertical = 5.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 row.forEach { path ->
-                    if (path == null) {
-                        AddTile(Modifier.weight(1f), onAddQuick)
-                    } else {
-                        QuickTile(
-                            path = path,
-                            rootPath = rootPath,
-                            editing = editing,
-                            modifier = Modifier.weight(1f),
-                            onClick = { if (editing) onRemoveQuick(path) else onOpen(path) },
-                            onLongClick = { editing = true },
-                        )
-                    }
+                    QuickTile(
+                        path = path,
+                        rootPath = rootPath,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onOpen(path) },
+                        onCustomize = { onCustomizeQuick(path) },
+                        onRemove = { onRemoveQuick(path) },
+                    )
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
-        if (editing) {
-            item(key = "editHint") {
-                Text(
-                    "برای حذف، روی پوشه بزنید.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = scheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
-                )
-            }
+        item(key = "quickHint") {
+            Text(
+                "برای تغییر آیکون، رنگ و شکل یا حذف، روی هر پوشه نگه دارید.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+            )
         }
 
         item(key = "mediaTitle") { ClassicSection("رسانه") }

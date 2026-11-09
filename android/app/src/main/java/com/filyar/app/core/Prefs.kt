@@ -36,7 +36,7 @@ data class ViewPrefs(
 )
 
 /** A user-chosen look for one folder: icon key and colour index (-1 = default colour). */
-data class FolderStyle(val icon: String, val color: Int)
+data class FolderStyle(val icon: String, val color: Int, val model: FolderModel? = null)
 
 class Prefs(context: Context) {
     private val sp = context.getSharedPreferences("filyar", Context.MODE_PRIVATE)
@@ -129,12 +129,17 @@ class Prefs(context: Context) {
     private fun loadStyles(): Map<String, FolderStyle> =
         sp.getStringSet("folderStyles", emptySet())!!.mapNotNull { line ->
             val parts = line.split(SEP)
-            if (parts.size != 3) null else parts[0] to FolderStyle(parts[1], parts[2].toIntOrNull() ?: -1)
+            if (parts.size !in 3..4) {
+                null
+            } else {
+                val model = parts.getOrNull(3)?.let { n -> FolderModel.values().firstOrNull { it.name == n } }
+                parts[0] to FolderStyle(parts[1], parts[2].toIntOrNull() ?: -1, model)
+            }
         }.toMap()
 
     private fun saveStyles(map: Map<String, FolderStyle>) {
         _styles.value = map
-        sp.edit().putStringSet("folderStyles", map.map { (p, s) -> "$p$SEP${s.icon}$SEP${s.color}" }.toSet()).apply()
+        sp.edit().putStringSet("folderStyles", map.map { (p, s) -> "$p$SEP${s.icon}$SEP${s.color}$SEP${s.model?.name ?: ""}" }.toSet()).apply()
     }
 
     fun setFolderStyle(path: String, style: FolderStyle?) {

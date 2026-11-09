@@ -1,5 +1,10 @@
 package com.filyar.app.ui
 
+import androidx.compose.material.icons.filled.Folder
+import com.filyar.app.core.FolderModel
+import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -142,15 +147,23 @@ fun FolderStyleDialog(
 ) {
     var icon by remember { mutableStateOf(current?.icon?.takeIf { it.isNotEmpty() }) }
     var color by remember { mutableIntStateOf(current?.color ?: -1) }
+    var model by remember { mutableStateOf(current?.model) }
     val tint = FolderIcons.colorAt(color) ?: Filyar.tokens.folder
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("آیکون «$name»", maxLines = 1, overflow = TextOverflow.Ellipsis) },
         text = {
             Column {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    val shown = icon?.let { FolderIcons.byKey(it) } ?: FolderIcons.builtinFor(name) ?: Icons.Filled.Folder
+                    FolderFrame(model ?: LocalViewPrefs.current.folderModel, tint, 56.dp) {
+                        Icon(shown, null, tint = tint, modifier = Modifier.size(if ((model ?: LocalViewPrefs.current.folderModel) == FolderModel.Plain) 52.dp else 32.dp))
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(52.dp),
-                    modifier = Modifier.height(220.dp),
+                    modifier = Modifier.height(190.dp),
                 ) {
                     items(FolderIcons.choices, key = { it.first }) { (key, vec) ->
                         val sel = icon == key
@@ -192,9 +205,27 @@ fun FolderStyleDialog(
                         }
                     }
                 }
+                Spacer(Modifier.height(8.dp))
+                Text("شکل", style = MaterialTheme.typography.labelLarge)
+                Row(
+                    Modifier
+                        .horizontalScroll(rememberScrollState())
+                        .padding(vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    listOf<Pair<FolderModel?, String>>(
+                        null to "پیش‌فرض",
+                        FolderModel.Tile to "کاشی",
+                        FolderModel.Circle to "دایره",
+                        FolderModel.Plain to "ساده",
+                        FolderModel.Outline to "خطی",
+                    ).forEach { (m, label) ->
+                        FilterChip(selected = model == m, onClick = { model = m }, label = { Text(label) })
+                    }
+                }
             }
         },
-        confirmButton = { TextButton(onClick = { onSave(FolderStyle(icon ?: "", color)) }) { Text("ذخیره") } },
+        confirmButton = { TextButton(onClick = { onSave(FolderStyle(icon ?: "", color, model)) }) { Text("ذخیره") } },
         dismissButton = {
             Row {
                 if (current != null) TextButton(onClick = { onSave(null) }) { Text("حالت خودکار") }

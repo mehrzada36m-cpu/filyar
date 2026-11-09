@@ -148,9 +148,10 @@ fun FolderGlyph(path: String, name: String, size: Dp, modifier: Modifier = Modif
     val icon = customIcon ?: builtin
         ?: (if (a == null && appIcons) FolderIcons.appFallbackFor(name) else null)
         ?: Icons.Filled.Folder
-    val plain = prefs.folderModel == FolderModel.Plain
+    val model = custom?.model ?: prefs.folderModel
+    val plain = model == FolderModel.Plain
     Box(modifier.size(size)) {
-        FolderFrame(prefs.folderModel, tint, size) {
+        FolderFrame(model, tint, size) {
             Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size * (if (plain) 0.92f else 0.56f)))
         }
         if (a != null) {
