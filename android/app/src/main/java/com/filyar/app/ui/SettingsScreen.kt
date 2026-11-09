@@ -103,7 +103,7 @@ fun SettingsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onBack: ()
             ) { sz -> vm.updateView { it.copy(itemSize = sz) } }
             Label("مدل پوشه")
             FolderModelPicker(selected = vp.folderModel) { m -> vm.updateView { it.copy(folderModel = m) } }
-            Label("حالت نمایش")
+            Label("چیدمان پیش‌فرض پوشه‌ها")
             Chips(
                 options = listOf(false to "فهرستی", true to "شبکه‌ای"),
                 selected = vp.grid,
@@ -134,6 +134,12 @@ fun SettingsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onBack: ()
             ) {
                 OutlinedButton(onClick = vm::resetQuickAccess, modifier = Modifier.weight(1f)) { Text("دسترسی سریع") }
                 OutlinedButton(onClick = vm::clearFolderStyles, modifier = Modifier.weight(1f)) { Text("آیکون پوشه‌ها") }
+            }
+            Row(
+                Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(onClick = vm::clearFolderLayouts, modifier = Modifier.weight(1f)) { Text("چیدمان پوشه‌ها") }
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.filyar.app.ui
 
+import androidx.compose.material.icons.filled.Android
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
@@ -109,6 +110,8 @@ fun HomeDashboard(
 
         item(key = "storage") { StorageCard(storage) { onOpen(rootPath) } }
         item(key = "data") { AndroidDataCard(shizuku == ShizukuStatus.Ready) { onOpen("$rootPath/Android/data") } }
+
+        item(key = "apks") { ApkFilesCard { onOpenCleaner(CleanMode.Apks) } }
 
         item(key = "cleaner") {
             CleanerCard(
@@ -319,6 +322,33 @@ private fun AndroidDataCard(ready: Boolean, onClick: () -> Unit) {
             )
             Spacer(Modifier.width(6.dp))
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = MaterialTheme.colorScheme.outline)
+        }
+    }
+}
+
+@Composable
+private fun ApkFilesCard(onClick: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(24.dp),
+        color = scheme.surfaceContainerLow,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+    ) {
+        Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+            CardIcon(Icons.Filled.Android, scheme.primary.copy(alpha = 0.14f), scheme.primary)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("فایل‌های برنامه‌ها", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "همه‌ی APKهای حافظه یکجا، با مسیر هر کدام",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = scheme.onSurfaceVariant,
+                )
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = scheme.outline)
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.filyar.app.ui
 
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.foundation.clickable
 import android.Manifest
 import android.content.Context
@@ -167,6 +168,10 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
     val localAccess by vm.localAccess.collectAsStateWithLifecycle()
     val quickAccess by vm.quickAccess.collectAsStateWithLifecycle()
     val folderStyles by vm.folderStyles.collectAsStateWithLifecycle()
+    val folderLayouts by vm.folderLayouts.collectAsStateWithLifecycle()
+    val curPath = st.path
+    val gridHere = curPath?.let { folderLayouts[it] } ?: vp.grid
+    val layoutOverridden = curPath != null && folderLayouts.containsKey(curPath)
     val context = LocalContext.current
     val backend = vm.backend
 
@@ -226,14 +231,18 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
                     subtitle = if (st.path == null) statusText(shizuku) else countText(st.items),
                     atHome = st.path == null,
                     shizukuReady = shizuku == ShizukuStatus.Ready,
-                    grid = vp.grid,
+                    grid = gridHere,
+                    layoutOverridden = layoutOverridden,
+                    defaultGrid = vp.grid,
                     sort = vp.sort,
                     ascending = vp.ascending,
                     foldersFirst = vp.foldersFirst,
                     showHidden = vp.showHidden,
                     onBack = { vm.goUp() },
                     onSearch = vm::openSearch,
-                    onToggleGrid = { vm.updateView { it.copy(grid = !it.grid) } },
+                    onToggleGrid = { curPath?.let { vm.setFolderLayout(it, !gridHere) } },
+                    onToggleGridAll = { vm.updateView { it.copy(grid = !it.grid) } },
+                    onResetLayout = { curPath?.let { vm.setFolderLayout(it, null) } },
                     onSort = { s -> vm.updateView { if (it.sort == s) it.copy(ascending = !it.ascending) else it.copy(sort = s, ascending = s == SortBy.Name || s == SortBy.Type) } },
                     onFoldersFirst = { vm.updateView { it.copy(foldersFirst = !it.foldersFirst) } },
                     onToggleHidden = { vm.updateView { it.copy(showHidden = !it.showHidden) } },
@@ -299,7 +308,7 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
                     Breadcrumbs(path, vm.rootPath) { vm.navigate(it) }
                     FolderContent(
                         st = st,
-                        grid = vp.grid,
+                        grid = gridHere,
                         vm = vm,
                         shizuku = shizuku,
                         onShizukuAction = shizukuAction,
@@ -464,6 +473,8 @@ private fun MainTopBar(
     atHome: Boolean,
     shizukuReady: Boolean,
     grid: Boolean,
+    layoutOverridden: Boolean,
+    defaultGrid: Boolean,
     sort: SortBy,
     ascending: Boolean,
     foldersFirst: Boolean,
@@ -471,6 +482,8 @@ private fun MainTopBar(
     onBack: () -> Unit,
     onSearch: () -> Unit,
     onToggleGrid: () -> Unit,
+    onToggleGridAll: () -> Unit,
+    onResetLayout: () -> Unit,
     onSort: (SortBy) -> Unit,
     onFoldersFirst: () -> Unit,
     onToggleHidden: () -> Unit,
@@ -516,9 +529,24 @@ private fun MainTopBar(
                 DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
                     if (!atHome) {
                         DropdownMenuItem(
-                            text = { Text(if (grid) "نمای فهرستی" else "نمای شبکه‌ای") },
+                            text = { Text(if (grid) "فهرستی کردن این پوشه" else "شبکه‌ای کردن این پوشه") },
                             leadingIcon = { Icon(if (grid) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.GridView, null) },
                             onClick = onToggleGrid,
+                        )
+                        if (layoutOverridden) {
+                            DropdownMenuItem(
+                                text = { Text("چیدمان این پوشه مثل پیش‌فرض") },
+                                leadingIcon = { Icon(Icons.Filled.Restore, null) },
+                                onClick = {
+                                    moreOpen = false
+                                    onResetLayout()
+                                },
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text(if (defaultGrid) "پیش‌فرض همه‌ی پوشه‌ها: فهرستی" else "پیش‌فرض همه‌ی پوشه‌ها: شبکه‌ای") },
+                            leadingIcon = { Icon(Icons.Filled.GridView, null) },
+                            onClick = onToggleGridAll,
                         )
                         HorizontalDivider()
                         Text(

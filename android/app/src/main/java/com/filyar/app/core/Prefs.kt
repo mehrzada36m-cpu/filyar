@@ -66,6 +66,11 @@ class Prefs(context: Context) {
     private val _styles = MutableStateFlow(loadStyles())
     val folderStyles: StateFlow<Map<String, FolderStyle>> = _styles.asStateFlow()
 
+    private val _layouts = MutableStateFlow(loadLayouts())
+
+    /** Folders whose list/grid choice differs from the global default (true = grid). */
+    val folderLayouts: StateFlow<Map<String, Boolean>> = _layouts.asStateFlow()
+
     fun updateView(transform: (ViewPrefs) -> ViewPrefs) {
         val v = transform(_view.value)
         _view.value = v
@@ -134,6 +139,27 @@ class Prefs(context: Context) {
 
     fun clearFolderStyles() = saveStyles(emptyMap())
 
+    // ---------- per-folder layout ----------
+    private fun loadLayouts(): Map<String, Boolean> =
+        sp.getStringSet("folderLayouts", emptySet())!!.mapNotNull { line ->
+            val parts = line.split(SEP)
+            if (parts.size != 2) null else parts[0] to (parts[1] == "1")
+        }.toMap()
+
+    private fun saveLayouts(map: Map<String, Boolean>) {
+        _layouts.value = map
+        sp.edit().putStringSet("folderLayouts", map.map { (p, g) -> "$p$SEP${if (g) "1" else "0"}" }.toSet()).apply()
+    }
+
+    /** [grid] null removes the override so the folder follows the default again. */
+    fun setFolderLayout(path: String, grid: Boolean?) {
+        val m = _layouts.value.toMutableMap()
+        if (grid == null) m.remove(path) else m[path] = grid
+        saveLayouts(m)
+    }
+
+    fun clearFolderLayouts() = saveLayouts(emptyMap())
+
     /** Keeps quick access entries and custom icons attached to a renamed or moved folder. */
     fun movePath(from: String, to: String) {
         fun map(p: String) = when {
@@ -144,6 +170,9 @@ class Prefs(context: Context) {
         if (_quick.value.any { it == from || it.startsWith("$from/") }) saveQuick(_quick.value.map(::map).distinct())
         if (_styles.value.keys.any { it == from || it.startsWith("$from/") }) {
             saveStyles(_styles.value.mapKeys { (k, _) -> map(k) })
+        }
+        if (_layouts.value.keys.any { it == from || it.startsWith("$from/") }) {
+            saveLayouts(_layouts.value.mapKeys { (k, _) -> map(k) })
         }
     }
 

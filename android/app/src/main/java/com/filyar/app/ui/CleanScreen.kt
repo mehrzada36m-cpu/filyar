@@ -1,5 +1,10 @@
 package com.filyar.app.ui
 
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -97,23 +102,35 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                 title = {
                     Column {
                         Text(
-                            if (mode == CleanMode.Large) "فایل‌های بزرگ" else "فایل‌های تکراری",
+                            when (mode) {
+                                CleanMode.Large -> "فایل‌های بزرگ"
+                                CleanMode.Duplicates -> "فایل‌های تکراری"
+                                CleanMode.Apks -> "فایل‌های برنامه‌ها"
+                            },
                             style = MaterialTheme.typography.titleLarge,
                         )
                         val sub = when {
                             c.scanning -> "در حال جستجو…"
                             mode == CleanMode.Large -> "${faNum(shown.size)} فایل • ${formatSize(shown.sumOf { it.size })}"
+                            mode == CleanMode.Apks -> "${faNum(c.apks.size)} فایل • ${formatSize(c.apks.sumOf { it.size })}"
                             else -> "${faNum(c.groups.size)} گروه • ${formatSize(c.groups.sumOf { g -> g[0].size * (g.size - 1) })} قابل آزاد شدن"
                         }
                         Text(sub, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 actions = {
-                    if (mode == CleanMode.Large && shown.isNotEmpty()) {
-                        IconButton(onClick = { vm.cleanSelect(shown.map { it.path }, true) }) { Icon(Icons.Filled.SelectAll, "انتخاب همه") }
+                    val selectable = if (mode == CleanMode.Apks) c.apks else shown
+                    if (mode != CleanMode.Duplicates && selectable.isNotEmpty()) {
+                        IconButton(onClick = { vm.cleanSelect(selectable.map { it.path }, true) }) { Icon(Icons.Filled.SelectAll, "انتخاب همه") }
                     }
                     IconButton(
-                        onClick = { if (mode == CleanMode.Large) vm.scanLarge(minBytes) else vm.scanDuplicates() },
+                        onClick = {
+                            when (mode) {
+                                CleanMode.Large -> vm.scanLarge(minBytes)
+                                CleanMode.Duplicates -> vm.scanDuplicates()
+                                CleanMode.Apks -> vm.scanApks()
+                            }
+                        },
                         enabled = !c.scanning,
                     ) { Icon(Icons.Filled.Refresh, "اسکن دوباره") }
                 },
@@ -171,6 +188,13 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                         custom = ""
                     },
                 )
+            } else if (mode == CleanMode.Apks) {
+                Text(
+                    "فایل‌های apk، apks، xapk و apkm در همه‌ی حافظه. برای دیدن آن‌ها داخل Android/data باید Shizuku روشن باشد.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+                )
             } else if (c.groups.isNotEmpty()) {
                 Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = vm::cleanSelectExtraCopies) {
@@ -195,6 +219,19 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                     LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 100.dp)) {
                         items(shown, key = { it.path }) { f ->
                             CleanRow(f, backend, vm.rootPath, f.path in c.selection, null) { vm.cleanToggle(f.path) }
+                        }
+                    }
+                }
+                mode == CleanMode.Apks -> if (c.apks.isEmpty() && !c.scanning) {
+                    StateMessage(Icons.Filled.Android, "فایل برنامه‌ای پیدا نشد", "هیچ APK یا بسته‌ی نصبی در حافظه نیست.")
+                } else {
+                    LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 100.dp)) {
+                        items(c.apks, key = { it.path }) { f ->
+                            CleanRow(
+                                f, backend, vm.rootPath, f.path in c.selection, null,
+                                showLocation = true,
+                                onOpenFolder = { vm.showInFolder(f.path) },
+                            ) { vm.cleanToggle(f.path) }
                         }
                     }
                 }
@@ -287,7 +324,16 @@ private fun SizeFilter(minBytes: Long, custom: String, onCustom: (String) -> Uni
 }
 
 @Composable
-private fun CleanRow(f: RemoteFile, backend: FileBackend, root: String, checked: Boolean, tag: String?, onToggle: () -> Unit) {
+private fun CleanRow(
+    f: RemoteFile,
+    backend: FileBackend,
+    root: String,
+    checked: Boolean,
+    tag: String?,
+    showLocation: Boolean = false,
+    onOpenFolder: (() -> Unit)? = null,
+    onToggle: () -> Unit,
+) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -305,14 +351,31 @@ private fun CleanRow(f: RemoteFile, backend: FileBackend, root: String, checked:
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(
-                f.parent.removePrefix(root).ifEmpty { "/" },
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.outline,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (showLocation) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Folder, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        "در: " + f.parent.removePrefix(root).trimStart('/').ifEmpty { "حافظه داخلی" },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            } else {
+                Text(
+                    f.parent.removePrefix(root).ifEmpty { "/" },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             if (tag != null) Text(tag, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+        }
+        if (onOpenFolder != null) {
+            IconButton(onClick = onOpenFolder) { Icon(Icons.Filled.FolderOpen, "نمایش در پوشه") }
         }
     }
 }

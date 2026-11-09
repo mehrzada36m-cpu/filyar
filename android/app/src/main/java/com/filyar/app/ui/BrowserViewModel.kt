@@ -71,7 +71,7 @@ sealed interface UiEvent {
     data class Launch(val intent: Intent) : UiEvent
 }
 
-enum class CleanMode { Large, Duplicates }
+enum class CleanMode { Large, Duplicates, Apks }
 
 /** State of the "advanced delete" screens. */
 data class CleanState(
@@ -84,6 +84,9 @@ data class CleanState(
     val scannedMin: Long = -1,
     val groups: List<List<RemoteFile>> = emptyList(),
     val duplicatesScanned: Boolean = false,
+    /** Installable app files (apk, apks, xapk, apkm) anywhere in storage, newest first. */
+    val apks: List<RemoteFile> = emptyList(),
+    val apksScanned: Boolean = false,
     val selection: Set<String> = emptySet(),
 )
 
@@ -98,6 +101,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     val viewPrefs: StateFlow<ViewPrefs> = prefs.view
     val quickAccess: StateFlow<List<String>> = prefs.quickAccess
     val folderStyles: StateFlow<Map<String, FolderStyle>> = prefs.folderStyles
+    val folderLayouts: StateFlow<Map<String, Boolean>> = prefs.folderLayouts
 
     private val _clean = MutableStateFlow(CleanState())
     val clean: StateFlow<CleanState> = _clean.asStateFlow()
@@ -416,6 +420,13 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setFolderStyle(path: String, style: FolderStyle?) = prefs.setFolderStyle(path, style)
 
+    fun setFolderLayout(path: String, grid: Boolean?) = prefs.setFolderLayout(path, grid)
+
+    fun clearFolderLayouts() {
+        prefs.clearFolderLayouts()
+        toast("چیدمان همه‌ی پوشه‌ها به حالت پیش‌فرض برگشت")
+    }
+
     fun clearFolderStyles() {
         prefs.clearFolderStyles()
         toast("آیکون همه‌ی پوشه‌ها به حالت خودکار برگشت")
@@ -433,6 +444,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
         when (mode) {
             CleanMode.Large -> if (_clean.value.scannedMin < 0) scanLarge(DEFAULT_LARGE_MIN)
             CleanMode.Duplicates -> if (!_clean.value.duplicatesScanned) scanDuplicates()
+            CleanMode.Apks -> if (!_clean.value.apksScanned) scanApks()
         }
     }
 
@@ -461,6 +473,33 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
                 _clean.update { it.copy(scanning = false, error = e.message ?: "جستجو ممکن نشد") }
             }
         }
+    }
+
+    fun scanApks() {
+        cleanJob?.cancel()
+        cleanJob = viewModelScope.launch {
+            _clean.update { it.copy(scanning = true, status = "در حال جستجوی فایل‌های برنامه‌ها…", error = null, selection = emptySet()) }
+            val b = backend
+            val res = withContext(Dispatchers.IO) {
+                runCatching {
+                    b.scan(rootPath, APK_MIN)
+                        .filter { it.extension in APK_EXTENSIONS }
+                        .sortedByDescending { it.lastModified }
+                }
+            }
+            res.onSuccess { list ->
+                _clean.update { it.copy(scanning = false, apks = list, apksScanned = true) }
+            }.onFailure { e ->
+                if (e is CancellationException) throw e
+                _clean.update { it.copy(scanning = false, error = e.message ?: "جستجو ممکن نشد") }
+            }
+        }
+    }
+
+    /** Leaves the clean screen and shows the folder that holds [path], so "back" returns home. */
+    fun showInFolder(path: String) {
+        closeClean()
+        openFromHome(parentPath(path))
     }
 
     fun scanDuplicates() {
@@ -506,7 +545,11 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
 
     fun cleanSelectedFiles(): List<RemoteFile> {
         val c = _clean.value
-        val pool = if (c.mode == CleanMode.Duplicates) c.groups.flatten() else c.large
+        val pool = when (c.mode) {
+            CleanMode.Duplicates -> c.groups.flatten()
+            CleanMode.Apks -> c.apks
+            else -> c.large
+        }
         return pool.filter { it.path in c.selection }.distinctBy { it.path }
     }
 
@@ -526,6 +569,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
             _clean.update { c ->
                 c.copy(
                     large = c.large.filterNot { it.path in removed },
+                    apks = c.apks.filterNot { it.path in removed },
                     groups = c.groups.map { g -> g.filterNot { it.path in removed } }.filter { it.size > 1 },
                     selection = c.selection - removed,
                 )
@@ -689,6 +733,8 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
         const val MB = 1024L * 1024
         const val DEFAULT_LARGE_MIN = 50 * MB
         const val DUPLICATE_MIN = 10L * 1024
+        const val APK_MIN = 50L * 1024
+        val APK_EXTENSIONS = setOf("apk", "apks", "xapk", "apkm")
     }
 }
 

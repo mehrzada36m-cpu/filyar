@@ -158,7 +158,7 @@ fun FolderGlyph(path: String, name: String, size: Dp, modifier: Modifier = Modif
             Box(
                 Modifier
                     .align(Alignment.BottomEnd)
-                    .offset(size * 0.08f, size * 0.08f)
+                    .offset(size * 0.05f, size * 0.05f)
                     .size(size * 0.44f)
                     .clip(badge)
                     .background(MaterialTheme.colorScheme.surface)
@@ -212,12 +212,19 @@ private fun FileGlyph(f: RemoteFile, backend: FileBackend, size: Dp) {
 
 @Composable
 fun FileIcon(f: RemoteFile, backend: FileBackend, size: Dp, selected: Boolean, modifier: Modifier = Modifier) {
-    Box(modifier.size(size).clip(RoundedCornerShape(size * 0.3f))) {
-        if (f.isDirectory) FolderGlyph(f.path, f.name, size) else FileGlyph(f, backend, size)
+    val shape = RoundedCornerShape(size * 0.3f)
+    // Folders are not clipped, so the app badge on their corner shows in full.
+    Box(modifier.size(size)) {
+        if (f.isDirectory) {
+            FolderGlyph(f.path, f.name, size)
+        } else {
+            Box(Modifier.fillMaxSize().clip(shape)) { FileGlyph(f, backend, size) }
+        }
         AnimatedVisibility(selected, enter = scaleIn(), exit = scaleOut()) {
             Box(
                 Modifier
                     .fillMaxSize()
+                    .clip(shape)
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)),
                 contentAlignment = Alignment.Center,
             ) {
