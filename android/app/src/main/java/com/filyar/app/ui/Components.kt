@@ -177,13 +177,13 @@ private fun FileGlyph(f: RemoteFile, backend: FileBackend, size: Dp) {
     val tint = kind.tint
     val context = LocalContext.current
     val previews = LocalViewPrefs.current.previews
-    val px = with(LocalDensity.current) { size.roundToPx() * 2 }
-    var thumb by remember(f.path, f.lastModified, previews) {
-        mutableStateOf(if (previews) Thumbnails.cached(f)?.asImageBitmap() else null)
+    val px = Thumbnails.bucket(with(LocalDensity.current) { (size.roundToPx() * 1.5f).toInt() })
+    var thumb by remember(f.path, f.lastModified, previews, px) {
+        mutableStateOf(if (previews) Thumbnails.cached(f, px)?.asImageBitmap() else null)
     }
     if (previews && thumb == null && Thumbnails.supports(f)) {
-        LaunchedEffect(f.path, f.lastModified) {
-            thumb = Thumbnails.load(context, backend, f, px.coerceAtMost(512))?.asImageBitmap()
+        LaunchedEffect(f.path, f.lastModified, px) {
+            thumb = Thumbnails.load(context, backend, f, px)?.asImageBitmap()
         }
     }
     Box(
@@ -235,6 +235,13 @@ fun FileIcon(f: RemoteFile, backend: FileBackend, size: Dp, selected: Boolean, m
     }
 }
 
+/** The user's size multiplier for this item: folders and files can be sized separately. */
+@Composable
+fun iconScaleFor(f: RemoteFile): Float {
+    val p = LocalViewPrefs.current
+    return if (f.isDirectory) p.folderScale else p.fileScale
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FileRow(
@@ -249,7 +256,8 @@ fun FileRow(
     onMore: () -> Unit,
 ) {
     val bg = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surface.copy(alpha = 0f)
-    val compact = iconSize < 42.dp
+    val shownIcon = iconSize * iconScaleFor(f)
+    val compact = shownIcon < 42.dp
     Row(
         Modifier
             .fillMaxWidth()
@@ -261,7 +269,7 @@ fun FileRow(
             .alpha(if (f.isHidden) 0.6f else 1f),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        FileIcon(f, backend, iconSize, selected)
+        FileIcon(f, backend, shownIcon, selected)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(
@@ -298,7 +306,7 @@ fun FileGridItem(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
-    val iconSize = LocalViewPrefs.current.itemSize.gridIcon
+    val iconSize = LocalViewPrefs.current.itemSize.gridIcon * iconScaleFor(f)
     val bg = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceContainerLow
     Column(
         Modifier

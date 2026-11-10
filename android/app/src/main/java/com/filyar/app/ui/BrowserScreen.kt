@@ -778,7 +778,7 @@ private fun FolderContent(
                 val gridState = remember(st.path) { LazyGridState(vm.scrollFor(st.path)) }
                 DisposableEffect(st.path) { onDispose { vm.saveScroll(st.path, gridState.firstVisibleItemIndex) } }
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(LocalViewPrefs.current.itemSize.gridCell),
+                    columns = GridCells.Adaptive(LocalViewPrefs.current.let { it.itemSize.gridCell * maxOf(1f, it.fileScale, it.folderScale) }),
                     state = gridState,
                     contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 120.dp),
                     modifier = Modifier.fillMaxSize(),

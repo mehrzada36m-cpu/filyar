@@ -1,5 +1,11 @@
 package com.filyar.app.ui
 
+import kotlin.math.roundToInt
+import com.filyar.app.core.faNum
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.material3.Slider
 import com.filyar.app.core.HomeStyle
 import com.filyar.app.ui.theme.Filyar
 import com.filyar.app.ui.theme.AccentColors
@@ -107,6 +113,8 @@ fun SettingsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onBack: ()
                 options = listOf(ItemSize.Compact to "فشرده", ItemSize.Standard to "استاندارد", ItemSize.Large to "بزرگ"),
                 selected = vp.itemSize,
             ) { sz -> vm.updateView { it.copy(itemSize = sz) } }
+            ScaleSlider("اندازه‌ی آیکون فایل‌ها", vp.fileScale) { v -> vm.updateView { it.copy(fileScale = v) } }
+            ScaleSlider("اندازه‌ی آیکون پوشه‌ها", vp.folderScale) { v -> vm.updateView { it.copy(folderScale = v) } }
             Label("مدل پوشه")
             FolderModelPicker(selected = vp.folderModel) { m -> vm.updateView { it.copy(folderModel = m) } }
             Label("چیدمان پیش‌فرض پوشه‌ها")
@@ -268,5 +276,27 @@ private fun FolderModelPicker(selected: FolderModel, onSelect: (FolderModel) -> 
                 Text(label, style = MaterialTheme.typography.labelMedium)
             }
         }
+    }
+}
+
+@Composable
+private fun ScaleSlider(title: String, value: Float, onCommit: (Float) -> Unit) {
+    var live by remember(value) { mutableFloatStateOf(value) }
+    Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Text(
+                "${faNum((live * 100).roundToInt())}٪",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Slider(
+            value = live,
+            onValueChange = { live = it },
+            onValueChangeFinished = { onCommit(live) },
+            valueRange = 0.7f..1.6f,
+            steps = 8,
+        )
     }
 }

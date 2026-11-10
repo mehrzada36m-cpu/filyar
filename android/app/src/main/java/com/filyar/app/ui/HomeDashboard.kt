@@ -188,14 +188,6 @@ private fun CardsHome(
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
-        item(key = "quickHint") {
-            Text(
-                "برای تغییر آیکون، رنگ و شکل یا حذف، روی هر پوشه نگه دارید.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
-            )
-        }
     }
 }
 
@@ -468,7 +460,7 @@ private fun QuickTile(
             .combinedClickable(onClick = onClick, onLongClick = { menu = true }),
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            FolderGlyph(path, name, 40.dp)
+            FolderGlyph(path, name, 40.dp * LocalViewPrefs.current.folderScale)
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(label, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -656,14 +648,6 @@ private fun ClassicHome(
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
-        }
-        item(key = "quickHint") {
-            Text(
-                "برای تغییر آیکون، رنگ و شکل یا حذف، روی هر پوشه نگه دارید.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
-            )
         }
 
         item(key = "mediaTitle") { ClassicSection("رسانه") }

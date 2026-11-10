@@ -33,6 +33,9 @@ data class ViewPrefs(
     val accent: Int = -1,
     val folderModel: FolderModel = FolderModel.Tile,
     val homeStyle: HomeStyle = HomeStyle.Cards,
+    /** Extra scaling on top of [itemSize]: 1f is the preset's own size. */
+    val fileScale: Float = 1f,
+    val folderScale: Float = 1f,
 )
 
 /** A user-chosen look for one folder: icon key and colour index (-1 = default colour). */
@@ -61,6 +64,8 @@ class Prefs(context: Context) {
             accent = sp.getInt("accent", -1),
             folderModel = enumPref("folderModel", FolderModel.Tile),
             homeStyle = enumPref("homeStyle", HomeStyle.Cards),
+            fileScale = sp.getFloat("fileScale", 1f).coerceIn(0.6f, 1.8f),
+            folderScale = sp.getFloat("folderScale", 1f).coerceIn(0.6f, 1.8f),
         )
     )
     val view: StateFlow<ViewPrefs> = _view.asStateFlow()
@@ -94,6 +99,8 @@ class Prefs(context: Context) {
             .putInt("accent", v.accent)
             .putString("folderModel", v.folderModel.name)
             .putString("homeStyle", v.homeStyle.name)
+            .putFloat("fileScale", v.fileScale)
+            .putFloat("folderScale", v.folderScale)
             .apply()
     }
 
