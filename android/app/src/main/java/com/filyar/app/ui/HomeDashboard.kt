@@ -1,5 +1,8 @@
 package com.filyar.app.ui
 
+import androidx.compose.material.icons.filled.FolderOff
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenu
@@ -104,11 +107,12 @@ fun HomeDashboard(
     onOpenCleaner: (CleanMode) -> Unit,
     style: HomeStyle = HomeStyle.Cards,
     onOpenMedia: (MediaKind) -> Unit = {},
+    onOpenBackups: () -> Unit = {},
 ) {
     if (style == HomeStyle.Classic) {
-        ClassicHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onGrantLocal, onRemoveQuick, onAddQuick, onCustomizeQuick, onOpenCleaner, onOpenMedia)
+        ClassicHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onGrantLocal, onRemoveQuick, onAddQuick, onCustomizeQuick, onOpenCleaner, onOpenMedia, onOpenBackups)
     } else {
-        CardsHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onShizukuAction, onShowGuide, onGrantLocal, onRemoveQuick, onAddQuick, onCustomizeQuick, onOpenCleaner)
+        CardsHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onShizukuAction, onShowGuide, onGrantLocal, onRemoveQuick, onAddQuick, onCustomizeQuick, onOpenCleaner, onOpenBackups)
     }
 }
 
@@ -127,6 +131,7 @@ private fun CardsHome(
     onAddQuick: () -> Unit,
     onCustomizeQuick: (String) -> Unit,
     onOpenCleaner: (CleanMode) -> Unit,
+    onOpenBackups: () -> Unit,
 ) {
     var cleanerOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -148,7 +153,15 @@ private fun CardsHome(
         item(key = "storage") { StorageCard(storage) { onOpen(rootPath) } }
         item(key = "data") { AndroidDataCard(shizuku == ShizukuStatus.Ready) { onOpen("$rootPath/Android/data") } }
 
-        item(key = "apks") { ApkFilesCard { onOpenCleaner(CleanMode.Apks) } }
+        item(key = "apks") {
+            ActionCard(Icons.Filled.Android, "فایل‌های برنامه‌ها", "همه‌ی APKهای حافظه، با نسخه و مسیر هر کدام") { onOpenCleaner(CleanMode.Apks) }
+        }
+        item(key = "recent") {
+            ActionCard(Icons.Filled.History, "فایل‌های اخیر", "تازه‌ترین فایل‌های ساخته یا تغییریافته") { onOpenCleaner(CleanMode.Recent) }
+        }
+        item(key = "backups") {
+            ActionCard(Icons.Filled.Backup, "پشتیبان‌ها", "پشتیبان دیتای برنامه‌ها (Android/data)") { onOpenBackups() }
+        }
 
         item(key = "cleaner") {
             CleanerCard(
@@ -349,7 +362,7 @@ private fun AndroidDataCard(ready: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ApkFilesCard(onClick: () -> Unit) {
+private fun ActionCard(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     Surface(
         onClick = onClick,
@@ -360,15 +373,11 @@ private fun ApkFilesCard(onClick: () -> Unit) {
             .padding(horizontal = 14.dp, vertical = 6.dp),
     ) {
         Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-            CardIcon(Icons.Filled.Android, scheme.primary.copy(alpha = 0.14f), scheme.primary)
+            CardIcon(icon, scheme.primary.copy(alpha = 0.14f), scheme.primary)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("فایل‌های برنامه‌ها", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "همه‌ی APKهای حافظه یکجا، با مسیر هر کدام",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = scheme.onSurfaceVariant,
-                )
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
             }
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = scheme.outline)
         }
@@ -399,7 +408,7 @@ private fun CleanerCard(expanded: Boolean, onToggle: () -> Unit, onOpen: (CleanM
                 Column(Modifier.weight(1f)) {
                     Text("حذف پیشرفته", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "آزاد کردن فضا با حذف فایل‌های بزرگ و تکراری",
+                        "آزاد کردن فضا با حذف فایل‌های بزرگ، تکراری و پوشه‌های باقی‌مانده",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -410,6 +419,7 @@ private fun CleanerCard(expanded: Boolean, onToggle: () -> Unit, onOpen: (CleanM
                 Column(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     CleanerOption(Icons.Filled.SdStorage, "فایل‌های بزرگ", "فایل‌های حجیم، از بزرگ به کوچک، با فیلتر حجم") { onOpen(CleanMode.Large) }
                     CleanerOption(Icons.Filled.FileCopy, "فایل‌های تکراری", "فایل‌های یکسانی که چند جا ذخیره شده‌اند") { onOpen(CleanMode.Duplicates) }
+                    CleanerOption(Icons.Filled.FolderOff, "پوشه‌های باقی‌مانده", "پوشه‌های Android/data برنامه‌های حذف‌شده") { onOpen(CleanMode.Leftovers) }
                 }
             }
         }
@@ -585,6 +595,7 @@ private fun ClassicHome(
     onCustomizeQuick: (String) -> Unit,
     onOpenCleaner: (CleanMode) -> Unit,
     onOpenMedia: (MediaKind) -> Unit,
+    onOpenBackups: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
     val total = storage?.getOrNull(0) ?: 0L
@@ -677,6 +688,22 @@ private fun ClassicHome(
                 ClassicTile(Icons.Filled.FileCopy, purple, "فایل‌های تکراری", "حذف کپی‌های اضافه", Modifier.weight(1f)) {
                     onOpenCleaner(CleanMode.Duplicates)
                 }
+            }
+        }
+        item(key = "tools2") {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+                ClassicTile(Icons.Filled.FolderOff, red, "پوشه‌های باقی‌مانده", "دیتای برنامه‌های حذف‌شده", Modifier.weight(1f)) {
+                    onOpenCleaner(CleanMode.Leftovers)
+                }
+                ClassicTile(Icons.Filled.History, blue, "فایل‌های اخیر", "تازه‌ترین فایل‌ها", Modifier.weight(1f)) {
+                    onOpenCleaner(CleanMode.Recent)
+                }
+            }
+        }
+        item(key = "tools3") {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+                ClassicTile(Icons.Filled.Backup, amber, "پشتیبان‌ها", "پشتیبان دیتای برنامه‌ها", Modifier.weight(1f)) { onOpenBackups() }
+                Spacer(Modifier.weight(1f))
             }
         }
     }

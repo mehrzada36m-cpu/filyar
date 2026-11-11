@@ -124,6 +124,46 @@ object FileOps {
         }
     }
 
+    /** Like [compress], but each item is stored under the given entry name (e.g. "data/com.app"). */
+    suspend fun compressAs(b: FileBackend, items: List<Pair<RemoteFile, String>>, zipPath: String, p: Progress) {
+        ZipOutputStream(BufferedOutputStream(b.openOutput(zipPath))).use { zos ->
+            for ((item, entry) in items) addEntry(b, zos, item, entry, p)
+        }
+    }
+
+    private val appFolder = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")
+
+    /**
+     * Puts the "data/<package>/…" and "obb/<package>/…" entries of a backup back under [androidDir].
+     * Existing files with the same name are replaced. Returns how many files were written.
+     */
+    suspend fun restore(b: FileBackend, zip: RemoteFile, androidDir: String, p: Progress): Int {
+        var count = 0
+        ZipInputStream(BufferedInputStream(b.openInput(zip.path))).use { zis ->
+            var entry = zis.nextEntry
+            while (entry != null) {
+                currentCoroutineContext().ensureActive()
+                val parts = entry.name.replace('\\', '/').split('/').filter { it.isNotEmpty() && it != "." }
+                val valid = parts.size >= 2 && parts[0] in setOf("data", "obb") && appFolder.matches(parts[1]) && parts.none { it == ".." }
+                if (valid) {
+                    val out = joinPath(androidDir, parts.joinToString("/"))
+                    if (entry.isDirectory) {
+                        b.mkdirs(out)
+                    } else {
+                        b.mkdirs(parentPath(out))
+                        p.file(parts.last())
+                        b.openOutput(out).use { output -> pipe(zis, output, p) }
+                        if (entry.time > 0) runCatching { b.setModified(out, entry.time) }
+                        count++
+                    }
+                }
+                zis.closeEntry()
+                entry = zis.nextEntry
+            }
+        }
+        return count
+    }
+
     private suspend fun addEntry(b: FileBackend, zos: ZipOutputStream, f: RemoteFile, entry: String, p: Progress) {
         currentCoroutineContext().ensureActive()
         if (f.isDirectory) {

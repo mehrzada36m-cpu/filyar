@@ -100,3 +100,10 @@ val FileKind.label: String
         FileKind.Code -> "کد"
         FileKind.Other -> "فایل"
     }
+
+/** A backup made by "backup app data". */
+fun isRestorable(f: RemoteFile): Boolean = !f.isDirectory && f.name.endsWith(".filyar.zip")
+
+/** A package folder directly inside Android/data or Android/obb. */
+fun isAppDataDir(f: RemoteFile, root: String): Boolean =
+    f.isDirectory && '.' in f.name && (f.parent == "$root/Android/data" || f.parent == "$root/Android/obb")

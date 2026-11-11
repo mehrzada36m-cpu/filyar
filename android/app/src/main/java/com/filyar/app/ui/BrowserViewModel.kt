@@ -1,5 +1,12 @@
 package com.filyar.app.ui
 
+import java.util.Locale
+import java.util.Date
+import java.text.SimpleDateFormat
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.sync.Semaphore
+import android.os.Bundle
+import android.content.ContentResolver
 import android.provider.MediaStore
 import android.Manifest
 import android.app.Application
@@ -74,7 +81,7 @@ sealed interface UiEvent {
     data class Launch(val intent: Intent) : UiEvent
 }
 
-enum class CleanMode { Large, Duplicates, Apks }
+enum class CleanMode { Large, Duplicates, Apks, Leftovers, Recent }
 
 /** The three kinds of media the home screen can list by folder. */
 enum class MediaKind(val title: String, val extensions: Set<String>) {
@@ -82,6 +89,16 @@ enum class MediaKind(val title: String, val extensions: Set<String>) {
     Videos("ویدیوها", setOf("mp4", "mkv", "webm", "3gp", "avi", "mov", "flv", "m4v", "mpg", "mpeg", "wmv", "ts")),
     Audio("موسیقی", setOf("mp3", "m4a", "aac", "ogg", "opus", "wav", "flac", "amr", "wma", "mid", "midi")),
 }
+
+/** What an APK file says about itself, next to what is installed. */
+data class ApkInfo(
+    val label: String,
+    val pkg: String,
+    val versionName: String,
+    val versionCode: Long,
+    val installedName: String?,
+    val installedCode: Long?,
+)
 
 /** One folder that holds media of one kind, with its newest file as a preview. */
 data class MediaFolderInfo(val path: String, val count: Int, val size: Long, val newest: RemoteFile)
@@ -112,6 +129,12 @@ data class CleanState(
     /** Installable app files (apk, apks, xapk, apkm) anywhere in storage, newest first. */
     val apks: List<RemoteFile> = emptyList(),
     val apksScanned: Boolean = false,
+    /** Android/data and Android/obb folders whose app is no longer installed. */
+    val leftovers: List<RemoteFile> = emptyList(),
+    val leftoversScanned: Boolean = false,
+    /** The newest files in storage, newest first. */
+    val recent: List<RemoteFile> = emptyList(),
+    val recentScanned: Boolean = false,
     val selection: Set<String> = emptySet(),
 )
 
@@ -497,6 +520,8 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
             CleanMode.Large -> if (_clean.value.scannedMin < 0) scanLarge(DEFAULT_LARGE_MIN)
             CleanMode.Duplicates -> if (!_clean.value.duplicatesScanned) scanDuplicates()
             CleanMode.Apks -> if (!_clean.value.apksScanned) scanApks()
+            CleanMode.Leftovers -> if (!_clean.value.leftoversScanned) scanLeftovers()
+            CleanMode.Recent -> if (!_clean.value.recentScanned) scanRecent()
         }
     }
 
@@ -678,6 +703,176 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
         if (mode != null) returnTo = { openClean(mode) }
     }
 
+    // ---------- folders left behind by uninstalled apps ----------
+    fun scanLeftovers() {
+        cleanJob?.cancel()
+        cleanJob = viewModelScope.launch {
+            _clean.update { it.copy(scanning = true, status = "در حال بررسی پوشه‌های برنامه‌ها…", error = null, selection = emptySet()) }
+            val b = backend
+            val app = getApplication<Application>()
+            val res = withContext(Dispatchers.IO) {
+                runCatching {
+                    val pm = app.packageManager
+                    val out = ArrayList<RemoteFile>()
+                    var listed = 0
+                    for (base in listOf("$rootPath/Android/data", "$rootPath/Android/obb")) {
+                        for (d in b.list(base)) {
+                            listed++
+                            if (!d.isDirectory || !PACKAGE_NAME.matches(d.name)) continue
+                            if (d.name == app.packageName || isInstalled(pm, d.name)) continue
+                            val bytes = runCatching { b.measure(d.path)[0] }.getOrDefault(0L)
+                            out.add(d.copy(size = bytes))
+                        }
+                    }
+                    if (listed == 0 && !b.isPrivileged) throw IOException("برای دیدن Android/data باید Shizuku روشن باشد")
+                    out.sortedByDescending { it.size }
+                }
+            }
+            res.onSuccess { list ->
+                _clean.update { it.copy(scanning = false, leftovers = list, leftoversScanned = true) }
+            }.onFailure { e ->
+                if (e is CancellationException) throw e
+                _clean.update { it.copy(scanning = false, error = e.message ?: "جستجو ممکن نشد") }
+            }
+        }
+    }
+
+    private fun isInstalled(pm: PackageManager, pkg: String): Boolean =
+        runCatching { pm.getPackageInfo(pkg, 0) }.isSuccess
+
+    // ---------- recent files ----------
+    fun scanRecent() {
+        cleanJob?.cancel()
+        cleanJob = viewModelScope.launch {
+            _clean.update { it.copy(scanning = true, status = "در حال یافتن فایل‌های اخیر…", error = null, selection = emptySet()) }
+            val b = backend
+            val res = withContext(Dispatchers.IO) {
+                runCatching {
+                    queryRecentStore().ifEmpty {
+                        b.scan(rootPath, 1024).filter { isUserPath(it.path) }.sortedByDescending { it.lastModified }.take(RECENT_COUNT)
+                    }
+                }
+            }
+            res.onSuccess { list ->
+                _clean.update { it.copy(scanning = false, recent = list, recentScanned = true) }
+            }.onFailure { e ->
+                if (e is CancellationException) throw e
+                _clean.update { it.copy(scanning = false, error = e.message ?: "جستجو ممکن نشد") }
+            }
+        }
+    }
+
+    /** App caches under Android/data and Android/obb and hidden folders are not "the user's files". */
+    private fun isUserPath(path: String): Boolean {
+        val rel = path.removePrefix(rootPath).trimStart('/')
+        if (rel.startsWith("Android/data/") || rel.startsWith("Android/obb/")) return false
+        return rel.substringBeforeLast('/', "").split('/').none { it.startsWith(".") }
+    }
+
+    /** The newest files according to the system media database: fast, but it only knows indexed files. */
+    private fun queryRecentStore(): List<RemoteFile> {
+        val resolver = getApplication<Application>().contentResolver
+        val uri = MediaStore.Files.getContentUri("external")
+        val args = Bundle().apply {
+            putString(
+                ContentResolver.QUERY_ARG_SQL_SELECTION,
+                "${MediaStore.Files.FileColumns.DATA} LIKE ? AND ${MediaStore.Files.FileColumns.SIZE} > 0 AND ${MediaStore.Files.FileColumns.MIME_TYPE} IS NOT NULL",
+            )
+            putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, arrayOf("$rootPath/%"))
+            putString(ContentResolver.QUERY_ARG_SQL_SORT_ORDER, "${MediaStore.Files.FileColumns.DATE_MODIFIED} DESC")
+            putInt(ContentResolver.QUERY_ARG_LIMIT, 1000)
+        }
+        val out = ArrayList<RemoteFile>()
+        runCatching {
+            resolver.query(uri, arrayOf(MediaStore.Files.FileColumns.DATA), args, null)?.use { c ->
+                val iPath = c.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATA)
+                while (c.moveToNext() && out.size < RECENT_COUNT) {
+                    val path = c.getString(iPath) ?: continue
+                    if (!isUserPath(path)) continue
+                    val f = File(path)
+                    if (!f.isFile) continue // the database can still list files that were deleted
+                    out.add(RemoteFile(path, f.name, false, f.length(), f.lastModified(), 0, true, false))
+                }
+            }
+        }
+        return out
+    }
+
+    // ---------- APK details ----------
+    private val apkInfoCache = HashMap<String, ApkInfo?>()
+    private val apkGate = Semaphore(2)
+
+    suspend fun apkInfo(f: RemoteFile): ApkInfo? {
+        if (f.extension != "apk") return null
+        val key = "${f.path}:${f.lastModified}:${f.size}"
+        synchronized(apkInfoCache) { if (apkInfoCache.containsKey(key)) return apkInfoCache[key] }
+        val info = apkGate.withPermit { withContext(Dispatchers.IO) { runCatching { readApkInfo(f) }.getOrNull() } }
+        synchronized(apkInfoCache) { apkInfoCache[key] = info }
+        return info
+    }
+
+    private fun readApkInfo(f: RemoteFile): ApkInfo? {
+        val app = getApplication<Application>()
+        val pm = app.packageManager
+        var temp: File? = null
+        val path = if (File(f.path).canRead()) {
+            f.path
+        } else {
+            // Android/data is hidden from the package manager, so read a private copy.
+            if (f.size > 300L * 1024 * 1024) return null
+            val t = File(app.cacheDir, "apkinfo/${System.nanoTime()}.apk").apply { parentFile?.mkdirs() }
+            backend.openInput(f.path).use { input -> t.outputStream().use { input.copyTo(it) } }
+            temp = t
+            t.absolutePath
+        }
+        try {
+            val pi = pm.getPackageArchiveInfo(path, 0) ?: return null
+            val ai = pi.applicationInfo
+            ai?.sourceDir = path
+            ai?.publicSourceDir = path
+            val label = ai?.loadLabel(pm)?.toString()?.takeIf { it.isNotBlank() } ?: pi.packageName
+            val code = if (Build.VERSION.SDK_INT >= 28) pi.longVersionCode else pi.versionCode.toLong()
+            val installed = runCatching { pm.getPackageInfo(pi.packageName, 0) }.getOrNull()
+            val installedCode = installed?.let { if (Build.VERSION.SDK_INT >= 28) it.longVersionCode else it.versionCode.toLong() }
+            return ApkInfo(label, pi.packageName, pi.versionName ?: "", code, installed?.versionName, installedCode)
+        } finally {
+            temp?.delete()
+        }
+    }
+
+    // ---------- backup and restore of app data ----------
+    fun backupAppData(dir: RemoteFile) = runOp("در حال پشتیبان‌گیری") { b, report ->
+        val pkg = dir.name
+        val parts = ArrayList<Pair<RemoteFile, String>>()
+        for (sub in listOf("data", "obb")) {
+            val src = b.stat("$rootPath/Android/$sub/$pkg")
+            if (src != null && src.isDirectory) parts.add(src to "$sub/$pkg")
+        }
+        if (parts.isEmpty()) throw IOException("دیتایی برای این برنامه پیدا نشد")
+        val backupDir = "$rootPath/Download/$BACKUP_DIR"
+        b.mkdirs(backupDir)
+        val stamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
+        val name = FileOps.uniqueName(b, backupDir, "$pkg-$stamp.filyar.zip")
+        val zipPath = joinPath(backupDir, name)
+        FileOps.compressAs(b, parts, zipPath, Progress(FileOps.totalSize(b, parts.map { it.first }), report))
+        "پشتیبان ساخته شد: $name (${formatSize(b.stat(zipPath)?.size ?: 0L)})"
+    }
+
+    fun restoreAppData(zip: RemoteFile) = runOp("در حال بازگردانی") { b, report ->
+        val n = FileOps.restore(b, zip, "$rootPath/Android", Progress(0, report))
+        if (n == 0) throw IOException("فایلی برای بازگردانی در این پشتیبان نبود")
+        "${faNum(n)} فایل بازگردانی شد"
+    }
+
+    /** Opens the folder that holds the backups, creating it the first time. */
+    fun openBackups() {
+        val dir = "$rootPath/Download/$BACKUP_DIR"
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { runCatching { backend.mkdirs(dir) } }
+            openFromHome(dir)
+        }
+    }
+
     fun scanDuplicates() {
         cleanJob?.cancel()
         cleanJob = viewModelScope.launch {
@@ -724,6 +919,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
         val pool = when (c.mode) {
             CleanMode.Duplicates -> c.groups.flatten()
             CleanMode.Apks -> c.apks
+            CleanMode.Leftovers -> c.leftovers
             else -> c.large
         }
         return pool.filter { it.path in c.selection }.distinctBy { it.path }
@@ -746,6 +942,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
                 c.copy(
                     large = c.large.filterNot { it.path in removed },
                     apks = c.apks.filterNot { it.path in removed },
+                    leftovers = c.leftovers.filterNot { it.path in removed },
                     groups = c.groups.map { g -> g.filterNot { it.path in removed } }.filter { it.size > 1 },
                     selection = c.selection - removed,
                 )
@@ -911,6 +1108,9 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
         const val DUPLICATE_MIN = 10L * 1024
         const val APK_MIN = 50L * 1024
         const val MEDIA_MIN = 20L * 1024
+        const val RECENT_COUNT = 200
+        const val BACKUP_DIR = "Filyar-Backup"
+        val PACKAGE_NAME = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")
         val ALL_MEDIA_EXTENSIONS: Set<String> = MediaKind.values().flatMap { it.extensions }.toSet()
         val APK_EXTENSIONS = setOf("apk", "apks", "xapk", "apkm")
     }

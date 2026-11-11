@@ -1,5 +1,6 @@
 package com.filyar.app.ui
 
+import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material3.FilterChip
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.foundation.clickable
@@ -141,6 +142,7 @@ private sealed interface Dlg {
     data class Props(val f: RemoteFile) : Dlg
     data class Compress(val items: List<RemoteFile>) : Dlg
     data class Extract(val f: RemoteFile) : Dlg
+    data class Restore(val f: RemoteFile) : Dlg
     data object AddQuick : Dlg
     data class QuickStyle(val path: String) : Dlg
     data class FolderStyleDlg(val f: RemoteFile) : Dlg
@@ -308,6 +310,7 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
                     onOpenCleaner = { vm.openClean(it) },
                     style = vp.homeStyle,
                     onOpenMedia = { vm.openMedia(it) },
+                    onOpenBackups = { vm.openBackups() },
                 )
                 else -> {
                     Breadcrumbs(path, vm.rootPath) { vm.navigate(it) }
@@ -392,6 +395,8 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
                         add(SheetAction(Icons.Filled.Share, "اشتراک‌گذاری") { vm.share(listOf(f)) })
                     }
                     if (isZip(f)) add(SheetAction(Icons.Filled.Unarchive, "استخراج در همین‌جا") { dlg = Dlg.Extract(f) })
+                    if (isRestorable(f)) add(SheetAction(Icons.Filled.Restore, "بازگردانی دیتای برنامه") { dlg = Dlg.Restore(f) })
+                    if (isAppDataDir(f, vm.rootPath)) add(SheetAction(Icons.Filled.Backup, "پشتیبان‌گیری از دیتای برنامه") { vm.backupAppData(f) })
                     add(SheetAction(Icons.Filled.ContentCopy, "کپی") { vm.setClip(listOf(f), cut = false) })
                     add(SheetAction(Icons.Filled.ContentCut, "انتقال") { vm.setClip(listOf(f), cut = true) })
                     add(SheetAction(Icons.Filled.DriveFileRenameOutline, "تغییر نام") { dlg = Dlg.Rename(f) })
@@ -446,6 +451,16 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
         ) {
             dlg = null
             vm.extract(d.f)
+        }
+        is Dlg.Restore -> ConfirmDialog(
+            title = "بازگردانی دیتا",
+            body = "دیتای «${d.f.name}» به Android/data و Android/obb برگردانده می‌شود و فایل‌های هم‌نام جایگزین می‌شوند. برنامه باید قبلاً نصب شده باشد.",
+            confirm = "بازگردانی",
+            danger = true,
+            onDismiss = { dlg = null },
+        ) {
+            dlg = null
+            vm.restoreAppData(d.f)
         }
         Dlg.AddQuick -> FolderPickerDialog(
             startPath = vm.rootPath,

@@ -1,5 +1,8 @@
 package com.filyar.app.ui
 
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.filled.Folder
@@ -106,6 +109,8 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                                 CleanMode.Large -> "فایل‌های بزرگ"
                                 CleanMode.Duplicates -> "فایل‌های تکراری"
                                 CleanMode.Apks -> "فایل‌های برنامه‌ها"
+                                CleanMode.Leftovers -> "پوشه‌های باقی‌مانده"
+                                CleanMode.Recent -> "فایل‌های اخیر"
                             },
                             style = MaterialTheme.typography.titleLarge,
                         )
@@ -113,14 +118,20 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                             c.scanning -> "در حال جستجو…"
                             mode == CleanMode.Large -> "${faNum(shown.size)} فایل • ${formatSize(shown.sumOf { it.size })}"
                             mode == CleanMode.Apks -> "${faNum(c.apks.size)} فایل • ${formatSize(c.apks.sumOf { it.size })}"
+                            mode == CleanMode.Leftovers -> "${faNum(c.leftovers.size)} پوشه • ${formatSize(c.leftovers.sumOf { it.size })} قابل آزاد شدن"
+                            mode == CleanMode.Recent -> "${faNum(c.recent.size)} فایل"
                             else -> "${faNum(c.groups.size)} گروه • ${formatSize(c.groups.sumOf { g -> g[0].size * (g.size - 1) })} قابل آزاد شدن"
                         }
                         Text(sub, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 actions = {
-                    val selectable = if (mode == CleanMode.Apks) c.apks else shown
-                    if (mode != CleanMode.Duplicates && selectable.isNotEmpty()) {
+                    val selectable = when (mode) {
+                        CleanMode.Apks -> c.apks
+                        CleanMode.Leftovers -> c.leftovers
+                        else -> shown
+                    }
+                    if (mode != CleanMode.Duplicates && mode != CleanMode.Recent && selectable.isNotEmpty()) {
                         IconButton(onClick = { vm.cleanSelect(selectable.map { it.path }, true) }) { Icon(Icons.Filled.SelectAll, "انتخاب همه") }
                     }
                     IconButton(
@@ -129,6 +140,8 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                                 CleanMode.Large -> vm.scanLarge(minBytes)
                                 CleanMode.Duplicates -> vm.scanDuplicates()
                                 CleanMode.Apks -> vm.scanApks()
+                                CleanMode.Leftovers -> vm.scanLeftovers()
+                                CleanMode.Recent -> vm.scanRecent()
                             }
                         },
                         enabled = !c.scanning,
@@ -195,7 +208,14 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
                 )
-            } else if (c.groups.isNotEmpty()) {
+            } else if (mode == CleanMode.Leftovers) {
+                Text(
+                    "پوشه‌هایی در Android/data و Android/obb که برنامه‌شان دیگر نصب نیست. حذف آن‌ها قابل برگشت نیست.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+                )
+            } else if (mode == CleanMode.Duplicates && c.groups.isNotEmpty()) {
                 Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = vm::cleanSelectExtraCopies) {
                         Icon(Icons.Filled.DoneAll, null)
@@ -227,11 +247,33 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                 } else {
                     LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 100.dp)) {
                         items(c.apks, key = { it.path }) { f ->
+                            var info by remember(f.path, f.lastModified) { mutableStateOf<ApkInfo?>(null) }
+                            LaunchedEffect(f.path, f.lastModified) { info = vm.apkInfo(f) }
                             CleanRow(
                                 f, backend, vm.rootPath, f.path in c.selection, null,
                                 showLocation = true,
                                 onOpenFolder = { vm.showInFolder(f.path) },
+                                info = info,
+                                onInstall = if (f.extension == "apk") ({ vm.openExternal(f, chooser = false) }) else null,
                             ) { vm.cleanToggle(f.path) }
+                        }
+                    }
+                }
+                mode == CleanMode.Leftovers -> if (c.leftovers.isEmpty() && !c.scanning) {
+                    StateMessage(Icons.Filled.FolderOff, "پوشه‌ی باقی‌مانده‌ای نیست", "همه‌ی پوشه‌های Android/data و Android/obb مال برنامه‌های نصب‌شده‌اند.")
+                } else {
+                    LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 100.dp)) {
+                        items(c.leftovers, key = { it.path }) { f ->
+                            CleanRow(f, backend, vm.rootPath, f.path in c.selection, null, showLocation = true) { vm.cleanToggle(f.path) }
+                        }
+                    }
+                }
+                mode == CleanMode.Recent -> if (c.recent.isEmpty() && !c.scanning) {
+                    StateMessage(Icons.Filled.History, "فایل اخیری پیدا نشد", "فایل‌هایی که تازه ساخته یا تغییر کرده‌اند اینجا نشان داده می‌شوند.")
+                } else {
+                    LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 32.dp)) {
+                        items(c.recent, key = { it.path }) { f ->
+                            RecentRow(f, backend, vm.rootPath, onOpen = { vm.open(f) }, onFolder = { vm.showInFolder(f.path) })
                         }
                     }
                 }
@@ -332,6 +374,8 @@ private fun CleanRow(
     tag: String?,
     showLocation: Boolean = false,
     onOpenFolder: (() -> Unit)? = null,
+    info: ApkInfo? = null,
+    onInstall: (() -> Unit)? = null,
     onToggle: () -> Unit,
 ) {
     Row(
@@ -372,10 +416,70 @@ private fun CleanRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            if (info != null) {
+                Text(
+                    "${info.label} • ${info.pkg}",
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val (status, color) = apkStatus(info)
+                Text(
+                    "نسخه ${info.versionName.ifEmpty { "؟" }} (${faNum(info.versionCode)}) • $status",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = color,
+                )
+            }
             if (tag != null) Text(tag, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+        }
+        if (onInstall != null) {
+            IconButton(onClick = onInstall) { Icon(Icons.Filled.SystemUpdate, "نصب") }
         }
         if (onOpenFolder != null) {
             IconButton(onClick = onOpenFolder) { Icon(Icons.Filled.FolderOpen, "نمایش در پوشه") }
         }
+    }
+}
+
+/** How this APK compares with the copy of the app that is installed. */
+@Composable
+private fun apkStatus(info: ApkInfo): Pair<String, androidx.compose.ui.graphics.Color> {
+    val scheme = MaterialTheme.colorScheme
+    val installed = info.installedCode
+    return when {
+        installed == null -> "نصب نیست" to scheme.tertiary
+        info.versionCode > installed -> "جدیدتر از نصب‌شده (${info.installedName ?: "؟"})" to scheme.primary
+        info.versionCode == installed -> "همین نسخه نصب است" to scheme.onSurfaceVariant
+        else -> "قدیمی‌تر از نصب‌شده (${info.installedName ?: "؟"})" to scheme.error
+    }
+}
+
+@Composable
+private fun RecentRow(f: RemoteFile, backend: FileBackend, root: String, onOpen: () -> Unit, onFolder: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen)
+            .padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FileIcon(f, backend, 46.dp, selected = false)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(f.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                "${formatDate(f.lastModified)} • ${formatSize(f.size)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                f.parent.removePrefix(root).trimStart('/').ifEmpty { "حافظه داخلی" },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        IconButton(onClick = onFolder) { Icon(Icons.Filled.FolderOpen, "نمایش در پوشه") }
     }
 }
