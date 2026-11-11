@@ -1,5 +1,6 @@
 package com.filyar.app.ui
 
+import android.provider.MediaStore
 import android.Manifest
 import android.app.Application
 import android.content.ActivityNotFoundException
@@ -57,6 +58,8 @@ data class BrowserState(
     val searchQuery: String? = null,
     val searchResults: List<RemoteFile> = emptyList(),
     val searching: Boolean = false,
+    /** Set when the folder was opened from a media list: only that kind of file is shown. */
+    val mediaOnly: MediaKind? = null,
 )
 
 data class Clip(val items: List<RemoteFile>, val cut: Boolean)
@@ -80,12 +83,16 @@ enum class MediaKind(val title: String, val extensions: Set<String>) {
     Audio("موسیقی", setOf("mp3", "m4a", "aac", "ogg", "opus", "wav", "flac", "amr", "wma", "mid", "midi")),
 }
 
-/** Every media file found in storage; the screen groups them by folder for the chosen [kind]. */
+/** One folder that holds media of one kind, with its newest file as a preview. */
+data class MediaFolderInfo(val path: String, val count: Int, val size: Long, val newest: RemoteFile)
+
 data class MediaState(
     val kind: MediaKind? = null,
     val scanning: Boolean = false,
-    val files: List<RemoteFile> = emptyList(),
+    val folders: Map<MediaKind, List<MediaFolderInfo>> = emptyMap(),
     val scanned: Boolean = false,
+    /** True once the whole file system was walked, so app folders and unindexed files are included. */
+    val fullScanned: Boolean = false,
     val scannedAt: Long = 0L,
     val error: String? = null,
     val includeHidden: Boolean = false,
@@ -134,6 +141,10 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Set when a folder was opened from a list screen (media, apk files): "back" returns there instead of home. */
     private var returnTo: (() -> Unit)? = null
+
+    /** While set, the folder at [mediaFilterPath] lists only this kind of file. */
+    private var mediaFilter: MediaKind? = null
+    private var mediaFilterPath: String? = null
 
     private val _clip = MutableStateFlow<Clip?>(null)
     val clip: StateFlow<Clip?> = _clip.asStateFlow()
@@ -210,8 +221,12 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
             homeAnchor = null
             returnTo = null
         }
+        if (path != mediaFilterPath) {
+            mediaFilter = null
+            mediaFilterPath = null
+        }
         _state.update {
-            it.copy(path = path, selection = emptySet(), searchQuery = null, searchResults = emptyList(), items = emptyList())
+            it.copy(path = path, selection = emptySet(), searchQuery = null, searchResults = emptyList(), items = emptyList(), mediaOnly = mediaFilter)
         }
         reload()
     }
@@ -272,7 +287,9 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun arrange(list: List<RemoteFile>): List<RemoteFile> {
         val vp = prefs.view.value
-        val visible = if (vp.showHidden) list else list.filterNot { it.isHidden }
+        val shown = if (vp.showHidden) list else list.filterNot { it.isHidden }
+        val onlyKind = mediaFilter
+        val visible = if (onlyKind == null) shown else shown.filter { !it.isDirectory && it.extension in onlyKind.extensions }
         val byName = Comparator<RemoteFile> { a, b -> NaturalOrder.compare(a.name, b.name) }
         val primary: Comparator<RemoteFile> = when (vp.sort) {
             SortBy.Name -> byName
@@ -486,7 +503,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     fun openMedia(kind: MediaKind) {
         _media.update { it.copy(kind = kind) }
         val m = _media.value
-        // Reuse the last scan for a couple of minutes so reopening is instant.
+        // Reuse the last result for a couple of minutes so reopening is instant.
         if (!m.scanning && (!m.scanned || System.currentTimeMillis() - m.scannedAt > 120_000)) scanMedia()
     }
 
@@ -496,29 +513,111 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setMediaIncludeHidden(v: Boolean) {
         _media.update { it.copy(includeHidden = v) }
+        // The media database does not index app folders, so showing them needs a full scan.
+        val m = _media.value
+        if (v && !m.fullScanned && !m.scanning) scanMedia(full = true)
     }
 
-    /** Leaves the media list and shows [path], so "back" returns home. */
+    fun rescanMedia() = scanMedia(full = _media.value.includeHidden)
+
+    /** Leaves the media list and shows [path] with only that kind of file, so "back" returns to the list. */
     fun showMediaFolder(path: String) {
         val kind = _media.value.kind
         closeMedia()
+        mediaFilter = kind
+        mediaFilterPath = path
         openFromHome(path)
         if (kind != null) returnTo = { openMedia(kind) }
     }
 
-    fun scanMedia() {
+    fun clearMediaFilter() {
+        mediaFilter = null
+        mediaFilterPath = null
+        _state.update { it.copy(items = arrange(rawItems), mediaOnly = null) }
+    }
+
+    /** Fast path: ask the system media database. Slow path: walk every file when it has nothing. */
+    fun scanMedia(full: Boolean = false) {
         mediaJob?.cancel()
         mediaJob = viewModelScope.launch {
             _media.update { it.copy(scanning = true, error = null) }
             val b = backend
             val res = withContext(Dispatchers.IO) {
-                runCatching { b.scan(rootPath, MEDIA_MIN).filter { it.extension in ALL_MEDIA_EXTENSIONS } }
+                runCatching {
+                    val fast: Map<MediaKind, List<MediaFolderInfo>> = if (full) emptyMap() else queryMediaStore()
+                    if (fast.values.any { it.isNotEmpty() }) {
+                        fast to false
+                    } else {
+                        groupMedia(b.scan(rootPath, MEDIA_MIN).filter { it.extension in ALL_MEDIA_EXTENSIONS }) to true
+                    }
+                }
             }
-            res.onSuccess { list ->
-                _media.update { it.copy(scanning = false, files = list, scanned = true, scannedAt = System.currentTimeMillis()) }
+            res.onSuccess { (folders, wasFull) ->
+                _media.update {
+                    it.copy(scanning = false, folders = folders, scanned = true, fullScanned = wasFull, scannedAt = System.currentTimeMillis())
+                }
             }.onFailure { e ->
                 if (e is CancellationException) throw e
                 _media.update { it.copy(scanning = false, error = e.message ?: "جستجو ممکن نشد") }
+            }
+        }
+    }
+
+    private fun groupMedia(files: List<RemoteFile>): Map<MediaKind, List<MediaFolderInfo>> =
+        MediaKind.values().associateWith { kind ->
+            files.filter { it.extension in kind.extensions }
+                .groupBy { it.parent }
+                .map { (dir, list) ->
+                    MediaFolderInfo(dir, list.size, list.sumOf { it.size }, list.maxByOrNull { it.lastModified } ?: list.first())
+                }
+        }
+
+    private class MediaAgg {
+        var count = 0
+        var size = 0L
+        var newestTime = -1L
+        var newestPath = ""
+        var newestSize = 0L
+    }
+
+    /** Folder totals straight from the media database, which answers in a fraction of a second. */
+    private fun queryMediaStore(): Map<MediaKind, List<MediaFolderInfo>> {
+        val resolver = getApplication<Application>().contentResolver
+        val root = rootPath
+        val sources = listOf(
+            MediaKind.Images to MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            MediaKind.Videos to MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+            MediaKind.Audio to MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+        )
+        return sources.associate { (kind, uri) ->
+            val agg = HashMap<String, MediaAgg>()
+            runCatching {
+                val columns = arrayOf(MediaStore.MediaColumns.DATA, MediaStore.MediaColumns.SIZE, MediaStore.MediaColumns.DATE_MODIFIED)
+                resolver.query(uri, columns, null, null, null)?.use { c ->
+                    val iPath = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATA)
+                    val iSize = c.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
+                    val iDate = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
+                    while (c.moveToNext()) {
+                        val path = c.getString(iPath) ?: continue
+                        if (!path.startsWith("$root/")) continue
+                        val a = agg.getOrPut(path.substringBeforeLast('/')) { MediaAgg() }
+                        val size = c.getLong(iSize)
+                        val time = c.getLong(iDate) * 1000
+                        a.count++
+                        a.size += size
+                        if (time >= a.newestTime) {
+                            a.newestTime = time
+                            a.newestPath = path
+                            a.newestSize = size
+                        }
+                    }
+                }
+            }
+            kind to agg.mapNotNull { (dir, a) ->
+                // The database can still list folders that were deleted since the last media scan.
+                if (!File(dir).exists()) return@mapNotNull null
+                val name = a.newestPath.substringAfterLast('/')
+                MediaFolderInfo(dir, a.count, a.size, RemoteFile(a.newestPath, name, false, a.newestSize, a.newestTime, 0, true, false))
             }
         }
     }

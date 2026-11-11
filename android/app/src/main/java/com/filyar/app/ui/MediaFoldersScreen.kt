@@ -42,13 +42,6 @@ import com.filyar.app.RemoteFile
 import com.filyar.app.core.faNum
 import com.filyar.app.core.formatSize
 
-private data class MediaFolder(
-    val path: String,
-    val count: Int,
-    val size: Long,
-    val newest: RemoteFile,
-)
-
 /** Android/data and Android/obb hold app caches, not the user's own media. */
 private fun isUserMedia(dir: String, root: String): Boolean {
     val rel = dir.removePrefix(root).trimStart('/')
@@ -66,14 +59,9 @@ fun MediaFoldersScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
     BackHandler { vm.closeMedia() }
     val root = vm.rootPath
 
-    val folders = remember(m.files, kind, m.includeHidden) {
-        m.files
-            .filter { it.extension in kind.extensions }
-            .filter { m.includeHidden || isUserMedia(it.parent, root) }
-            .groupBy { it.parent }
-            .map { (dir, list) ->
-                MediaFolder(dir, list.size, list.sumOf { it.size }, list.maxByOrNull { it.lastModified } ?: list.first())
-            }
+    val folders = remember(m.folders, kind, m.includeHidden) {
+        m.folders[kind].orEmpty()
+            .filter { m.includeHidden || isUserMedia(it.path, root) }
             .sortedByDescending { it.newest.lastModified }
     }
     val total = folders.sumOf { it.count }
@@ -96,7 +84,7 @@ fun MediaFoldersScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                     }
                 },
                 actions = {
-                    IconButton(onClick = vm::scanMedia, enabled = !m.scanning) { Icon(Icons.Filled.Refresh, "اسکن دوباره") }
+                    IconButton(onClick = vm::rescanMedia, enabled = !m.scanning) { Icon(Icons.Filled.Refresh, "اسکن دوباره") }
                 },
             )
         },
@@ -130,7 +118,7 @@ private fun kindIcon(kind: MediaKind) = when (kind) {
 }
 
 @Composable
-private fun FolderRow(f: MediaFolder, vm: BrowserViewModel, root: String, onClick: () -> Unit) {
+private fun FolderRow(f: MediaFolderInfo, vm: BrowserViewModel, root: String, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()

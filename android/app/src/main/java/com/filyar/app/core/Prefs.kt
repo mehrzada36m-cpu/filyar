@@ -43,6 +43,8 @@ data class ViewPrefs(
     val bgColor: Int = -1,
     /** Scales the space around files and folders: 1f is the standard spacing. */
     val itemGap: Float = 1f,
+    /** Columns in grid view; 0 picks as many as fit. */
+    val gridColumns: Int = 0,
 )
 
 /** A user-chosen look for one folder: icon key and colour index (-1 = default colour). */
@@ -77,6 +79,7 @@ class Prefs(context: Context) {
             cardColor = sp.getInt("cardColor", -1),
             bgColor = sp.getInt("bgColor", -1),
             itemGap = sp.getFloat("itemGap", 1f).coerceIn(0f, 2f),
+            gridColumns = sp.getInt("gridColumns", 0).coerceIn(0, 8),
         )
     )
     val view: StateFlow<ViewPrefs> = _view.asStateFlow()
@@ -116,6 +119,7 @@ class Prefs(context: Context) {
             .putInt("cardColor", v.cardColor)
             .putInt("bgColor", v.bgColor)
             .putFloat("itemGap", v.itemGap)
+            .putInt("gridColumns", v.gridColumns)
             .apply()
     }
 

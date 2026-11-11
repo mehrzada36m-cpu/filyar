@@ -1,5 +1,6 @@
 package com.filyar.app.ui
 
+import androidx.compose.material3.FilterChip
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.foundation.clickable
 import android.Manifest
@@ -310,6 +311,16 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
                 )
                 else -> {
                     Breadcrumbs(path, vm.rootPath) { vm.navigate(it) }
+                    st.mediaOnly?.let { k ->
+                        Row(Modifier.padding(horizontal = 16.dp, vertical = 2.dp)) {
+                            FilterChip(
+                                selected = true,
+                                onClick = vm::clearMediaFilter,
+                                label = { Text("فقط ${k.title}") },
+                                trailingIcon = { Icon(Icons.Filled.Close, "نمایش همه‌ی فایل‌ها", Modifier.size(16.dp)) },
+                            )
+                        }
+                    }
                     FolderContent(
                         st = st,
                         grid = gridHere,
@@ -779,7 +790,16 @@ private fun FolderContent(
                 val gridState = remember(st.path) { LazyGridState(vm.scrollFor(st.path)) }
                 DisposableEffect(st.path) { onDispose { vm.saveScroll(st.path, gridState.firstVisibleItemIndex) } }
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(LocalViewPrefs.current.let { it.itemSize.gridCell * maxOf(1f, it.fileScale, it.folderScale) }),
+                    columns = LocalViewPrefs.current.let { p ->
+                        val scale = maxOf(1f, p.fileScale, p.folderScale)
+                        val icon = p.itemSize.gridIcon * maxOf(p.fileScale, p.folderScale)
+                        if (p.gridColumns > 0) {
+                            GridCells.Fixed(p.gridColumns)
+                        } else {
+                            // A smaller gap narrows the cells, so more items fit in a row.
+                            GridCells.Adaptive(maxOf(icon + 12.dp, p.itemSize.gridCell * scale * (0.5f + 0.5f * p.itemGap)))
+                        }
+                    },
                     state = gridState,
                     contentPadding = LocalViewPrefs.current.itemGap.let { g -> PaddingValues(start = 8.dp * g, end = 8.dp * g, top = 4.dp * g, bottom = 120.dp) },
                     modifier = Modifier.fillMaxSize(),

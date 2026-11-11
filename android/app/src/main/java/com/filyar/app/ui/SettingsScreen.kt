@@ -120,6 +120,11 @@ fun SettingsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onBack: ()
             ScaleSlider("اندازه‌ی آیکون فایل‌ها", vp.fileScale) { v -> vm.updateView { it.copy(fileScale = v) } }
             ScaleSlider("اندازه‌ی آیکون پوشه‌ها", vp.folderScale) { v -> vm.updateView { it.copy(folderScale = v) } }
             ScaleSlider("فاصله‌ی بین آیتم‌ها", vp.itemGap, range = 0f..1.6f, steps = 7) { v -> vm.updateView { it.copy(itemGap = v) } }
+            Label("تعداد ستون‌ها در نمای شبکه‌ای")
+            Chips(
+                options = listOf(0 to "خودکار", 3 to "۳", 4 to "۴", 5 to "۵", 6 to "۶"),
+                selected = vp.gridColumns,
+            ) { n -> vm.updateView { it.copy(gridColumns = n) } }
             Label("مدل پوشه")
             FolderModelPicker(selected = vp.folderModel) { m -> vm.updateView { it.copy(folderModel = m) } }
             Label("چیدمان پیش‌فرض پوشه‌ها")
