@@ -147,13 +147,7 @@ private fun CardsHome(
 
         if (!localAccess && shizuku != ShizukuStatus.Ready) {
             item(key = "local") {
-                InfoCard(
-                    icon = Icons.Filled.LockOpen,
-                    title = "دسترسی به حافظه",
-                    body = "برای مرور پوشه‌های معمولی بدون Shizuku، اجازه‌ی دسترسی به همه‌ی فایل‌ها را بدهید.",
-                    action = "اجازه دادن",
-                    onAction = onGrantLocal,
-                )
+                PermissionCapsule(onGrantLocal)
             }
         }
 
@@ -513,6 +507,53 @@ private fun QuickTile(
     }
 }
 
+// Shown only on the first launch after install; the × hides it right away.
+private var permCardFirstRun: Boolean? = null
+private var permCardDismissed by mutableStateOf(false)
+
+@Composable
+private fun PermissionCapsule(onGrant: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    if (permCardFirstRun == null) {
+        val sp = context.getSharedPreferences("filyar_ui", android.content.Context.MODE_PRIVATE)
+        permCardFirstRun = !sp.getBoolean("perm_card_seen", false)
+        sp.edit().putBoolean("perm_card_seen", true).apply()
+    }
+    if (permCardFirstRun != true || permCardDismissed) return
+    val fg = MaterialTheme.colorScheme.onTertiaryContainer
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+    ) {
+        Row(
+            Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Filled.LockOpen, null, tint = fg, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(10.dp))
+            Text(
+                "دسترسی به همه‌ی فایل‌ها",
+                style = MaterialTheme.typography.labelLarge,
+                color = fg,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Button(
+                onClick = onGrant,
+                modifier = Modifier.height(34.dp),
+                contentPadding = PaddingValues(horizontal = 14.dp),
+            ) { Text("اجازه دادن", style = MaterialTheme.typography.labelMedium) }
+            IconButton(onClick = { permCardDismissed = true }, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Filled.Close, "بستن", tint = fg, modifier = Modifier.size(18.dp))
+            }
+        }
+    }
+}
+
 @Composable
 private fun InfoCard(icon: ImageVector, title: String, body: String, action: String, onAction: () -> Unit) {
     Surface(
@@ -621,14 +662,7 @@ private fun ClassicHome(
     LazyColumn(state = listState, contentPadding = PaddingValues(top = 0.dp, bottom = 32.dp)) {
         if (!localAccess && shizuku != ShizukuStatus.Ready) {
             item(key = "local") {
-                Spacer(Modifier.height(8.dp))
-                InfoCard(
-                    icon = Icons.Filled.LockOpen,
-                    title = "دسترسی به حافظه",
-                    body = "برای مرور پوشه‌های معمولی بدون Shizuku، اجازه‌ی دسترسی به همه‌ی فایل‌ها را بدهید.",
-                    action = "اجازه دادن",
-                    onAction = onGrantLocal,
-                )
+                PermissionCapsule(onGrantLocal)
             }
         }
 
@@ -637,14 +671,14 @@ private fun ClassicHome(
             ClassicTile(
                 Icons.Filled.PhoneAndroid, blue, "حافظه داخلی",
                 (if (total > 0) "${formatSize(total)} • ${formatSize(free)} خالی\n" else "") + rootPath,
-                Modifier.fillMaxWidth(),
+                Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             ) { onOpen(rootPath) }
         }
         item(key = "data") {
             ClassicTile(
                 Icons.Filled.FolderSpecial, amber, "Android/data",
                 "دیتای برنامه‌ها و بازی‌ها",
-                Modifier.fillMaxWidth(),
+                Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             ) { onOpen("$rootPath/Android/data") }
         }
 
@@ -657,7 +691,7 @@ private fun ClassicHome(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 5.dp),
+                    .padding(horizontal = 8.dp, vertical = 5.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 row.forEach { path ->
@@ -677,7 +711,7 @@ private fun ClassicHome(
 
         item(key = "mediaTitle") { ClassicSection("رسانه") }
         item(key = "media1") {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
                 ClassicTile(
                     Icons.Filled.Image, blue, "تصاویر",
                     if (stats.loaded) "${faNum(stats.images)} تصویر • ${formatSize(stats.imageBytes)}\n${faNum(stats.cameraImages)} عکس دوربین" else "پوشه‌های دارای عکس",
@@ -691,7 +725,7 @@ private fun ClassicHome(
             }
         }
         item(key = "media2") {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
                 ClassicTile(
                     Icons.Filled.MusicNote, teal, "موسیقی",
                     if (stats.loaded) {
@@ -711,7 +745,7 @@ private fun ClassicHome(
 
         item(key = "toolsTitle") { ClassicSection("ابزارها") }
         item(key = "tools") {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
                 ClassicTile(Icons.Filled.SdStorage, purple, "فایل‌های بزرگ", "پاکسازی فایل‌های حجیم", Modifier.weight(1f)) {
                     onOpenCleaner(CleanMode.Large)
                 }
@@ -721,7 +755,7 @@ private fun ClassicHome(
             }
         }
         item(key = "tools2") {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
                 ClassicTile(Icons.Filled.FolderOff, red, "پوشه‌های باقی‌مانده", "دیتای برنامه‌های حذف‌شده", Modifier.weight(1f)) {
                     onOpenCleaner(CleanMode.Leftovers)
                 }
@@ -731,7 +765,7 @@ private fun ClassicHome(
             }
         }
         item(key = "tools3") {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
                 ClassicTile(Icons.Filled.Backup, amber, "پشتیبان‌ها", "پشتیبان دیتای برنامه‌ها", Modifier.weight(1f)) { onOpenBackups() }
                 Spacer(Modifier.weight(1f))
             }

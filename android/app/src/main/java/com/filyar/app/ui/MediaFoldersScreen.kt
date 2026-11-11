@@ -146,12 +146,12 @@ fun MediaFoldersScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                 } else if (folders.isEmpty() && !m.scanning) {
                     item(key = "empty") { EmptyNote("هیچ پوشه‌ای با این نوع فایل در حافظه نیست.") }
                 }
-                items(folders.chunked(3), key = { row -> row.first().path }) { row ->
+                items(folders.chunked(4), key = { row -> row.first().path }) { row ->
                     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                         row.forEach { f ->
                             Box(Modifier.weight(1f)) { FolderTile(f, vm) { vm.showMediaFolder(f.path) } }
                         }
-                        repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                        repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
             }
@@ -172,15 +172,15 @@ private fun FolderTile(f: MediaFolderInfo, vm: BrowserViewModel, onClick: () -> 
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 8.dp),
+            .padding(horizontal = 2.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // The newest file stands in as the folder's preview.
-        FileIcon(f.newest, vm.backend, 88.dp, selected = false)
+        FileIcon(f.newest, vm.backend, 64.dp, selected = false)
         Spacer(Modifier.height(6.dp))
         Text(
             f.path.substringAfterLast('/'),
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
