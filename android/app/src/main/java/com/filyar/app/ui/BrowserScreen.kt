@@ -113,6 +113,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.paint
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -174,6 +178,7 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
     val folderStyles by vm.folderStyles.collectAsStateWithLifecycle()
     val folderLayouts by vm.folderLayouts.collectAsStateWithLifecycle()
     val stats by vm.stats.collectAsStateWithLifecycle()
+    val homeBg by vm.homeBg.collectAsStateWithLifecycle()
     LaunchedEffect(st.path == null) { if (st.path == null) vm.refreshStats() }
     val curPath = st.path
     val gridHere = curPath?.let { folderLayouts[it] } ?: vp.grid
@@ -184,6 +189,18 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
     var dlg by remember { mutableStateOf<Dlg?>(null) }
 
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { vm.onResume() }
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= 33) {
+            val media = arrayOf(
+                Manifest.permission.READ_MEDIA_AUDIO,
+                Manifest.permission.READ_MEDIA_IMAGES,
+                Manifest.permission.READ_MEDIA_VIDEO,
+            )
+            if (media.any { context.checkSelfPermission(it) != android.content.pm.PackageManager.PERMISSION_GRANTED }) {
+                permLauncher.launch(media)
+            }
+        }
+    }
     val grantLocal: () -> Unit = {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
@@ -226,8 +243,18 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
         }
     }
 
+    val showBg = homeBg != null && st.path == null && !searching
+    val bgModifier = if (showBg && homeBg != null) {
+        Modifier
+            .clipToBounds()
+            .paint(BitmapPainter(homeBg!!), contentScale = ContentScale.Crop)
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.55f))
+    } else {
+        Modifier
+    }
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        modifier = bgModifier,
+        containerColor = if (showBg) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
             when {
                 selecting -> SelectionTopBar(st.selection.size, onClose = vm::clearSelection, onSelectAll = vm::selectAll)
@@ -538,7 +565,7 @@ private fun MainTopBar(
 ) {
     var moreOpen by remember { mutableStateOf(false) }
     TopAppBar(
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = if (atHome) Color.Transparent else MaterialTheme.colorScheme.background),
         navigationIcon = {
             if (!atHome) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت") }

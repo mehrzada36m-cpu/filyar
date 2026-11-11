@@ -54,6 +54,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import java.io.IOException
 
 enum class ErrorKind { NeedsShizuku, NeedsPermission, Generic }
@@ -1318,6 +1320,60 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
             f.extension == "zip" -> _zipPrompt.value = f
             else -> openExternal(f, chooser = false)
         }
+    }
+
+    // ---------- home screen background picture ----------
+    private val _homeBg = MutableStateFlow<ImageBitmap?>(null)
+    val homeBg: StateFlow<ImageBitmap?> = _homeBg.asStateFlow()
+
+    private fun homeBgFile() = File(getApplication<Application>().filesDir, "home_bg.jpg")
+
+    init { loadHomeBg() }
+
+    private fun loadHomeBg() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val f = homeBgFile()
+            _homeBg.value = if (f.exists()) runCatching { android.graphics.BitmapFactory.decodeFile(f.path)?.asImageBitmap() }.getOrNull() else null
+        }
+    }
+
+    /** Copies the picked picture into the app (scaled down, rotated upright) so it keeps working if the original moves. */
+    fun setHomeBackground(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val cr = getApplication<Application>().contentResolver
+                val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                cr.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
+                var sample = 1
+                while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 1600) sample *= 2
+                val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+                var bmp = cr.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, opts) }
+                    ?: throw IOException("خواندن تصویر ممکن نشد")
+                val orientation = runCatching {
+                    cr.openInputStream(uri)?.use {
+                        android.media.ExifInterface(it).getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, android.media.ExifInterface.ORIENTATION_NORMAL)
+                    }
+                }.getOrNull() ?: android.media.ExifInterface.ORIENTATION_NORMAL
+                val matrix = android.graphics.Matrix()
+                when (orientation) {
+                    android.media.ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+                    android.media.ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+                    android.media.ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+                    else -> {}
+                }
+                if (!matrix.isIdentity) bmp = android.graphics.Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
+                homeBgFile().outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 88, it) }
+                _homeBg.value = bmp.asImageBitmap()
+                toast("تصویر زمینه تنظیم شد")
+            } catch (e: Throwable) {
+                toast(e.message ?: "تنظیم تصویر ممکن نشد")
+            }
+        }
+    }
+
+    fun removeHomeBackground() {
+        homeBgFile().delete()
+        _homeBg.value = null
     }
 
     // ---------- built-in installer and ZIP preview ----------
