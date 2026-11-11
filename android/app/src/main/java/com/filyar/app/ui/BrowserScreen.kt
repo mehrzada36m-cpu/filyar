@@ -311,6 +311,7 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
                     style = vp.homeStyle,
                     onOpenMedia = { vm.openMedia(it) },
                     onOpenBackups = { vm.openBackups() },
+                    listState = vm.homeListState,
                 )
                 else -> {
                     Breadcrumbs(path, vm.rootPath) { vm.navigate(it) }
@@ -802,8 +803,10 @@ private fun FolderContent(
             )
             st.items.isEmpty() -> StateMessage(Icons.Filled.FolderOpen, "این پوشه خالی است", "با دکمه‌ی + پوشه یا فایل بسازید.")
             grid -> {
-                val gridState = remember(st.path) { LazyGridState(vm.scrollFor(st.path)) }
-                DisposableEffect(st.path) { onDispose { vm.saveScroll(st.path, gridState.firstVisibleItemIndex) } }
+                val gridState = remember(st.path) { vm.scrollFor(st.path).let { (i, o) -> LazyGridState(i, o) } }
+                DisposableEffect(st.path) {
+                    onDispose { vm.saveScroll(st.path, gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset) }
+                }
                 LazyVerticalGrid(
                     columns = LocalViewPrefs.current.let { p ->
                         val scale = maxOf(1f, p.fileScale, p.folderScale)
@@ -825,8 +828,10 @@ private fun FolderContent(
                 }
             }
             else -> {
-                val listState = remember(st.path) { LazyListState(vm.scrollFor(st.path)) }
-                DisposableEffect(st.path) { onDispose { vm.saveScroll(st.path, listState.firstVisibleItemIndex) } }
+                val listState = remember(st.path) { vm.scrollFor(st.path).let { (i, o) -> LazyListState(i, o) } }
+                DisposableEffect(st.path) {
+                    onDispose { vm.saveScroll(st.path, listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) }
+                }
                 LazyColumn(
                     state = listState,
                     contentPadding = PaddingValues(top = 2.dp, bottom = 120.dp),

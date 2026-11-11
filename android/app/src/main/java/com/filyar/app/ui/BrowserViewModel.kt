@@ -1,5 +1,6 @@
 package com.filyar.app.ui
 
+import androidx.compose.foundation.lazy.LazyListState
 import java.util.Locale
 import java.util.Date
 import java.text.SimpleDateFormat
@@ -191,7 +192,15 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     private var loadJob: Job? = null
     private var searchJob: Job? = null
     private var opJob: Job? = null
-    private val scrollMemory = HashMap<String, Int>()
+    private val scrollMemory = HashMap<String, Pair<Int, Int>>()
+
+    /** Scroll position of the home screen; it lives here so it survives opening a folder or another screen. */
+    val homeListState = LazyListState()
+
+    private val cleanStates = HashMap<CleanMode, LazyListState>()
+    private val mediaStates = HashMap<MediaKind, LazyListState>()
+    fun cleanListState(mode: CleanMode): LazyListState = cleanStates.getOrPut(mode) { LazyListState() }
+    fun mediaListState(kind: MediaKind): LazyListState = mediaStates.getOrPut(kind) { LazyListState() }
 
     val backend: FileBackend get() = ShizukuManager.backend()
 
@@ -226,9 +235,9 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ---------- navigation ----------
-    fun scrollFor(path: String?): Int = scrollMemory[path ?: ""] ?: 0
-    fun saveScroll(path: String?, index: Int) {
-        scrollMemory[path ?: ""] = index
+    fun scrollFor(path: String?): Pair<Int, Int> = scrollMemory[path ?: ""] ?: (0 to 0)
+    fun saveScroll(path: String?, index: Int, offset: Int) {
+        scrollMemory[path ?: ""] = index to offset
     }
 
     /** Opens a folder from the home screen so that "back" returns to home, not to its parent. */
@@ -514,7 +523,9 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ---------- advanced delete (large & duplicate files) ----------
-    fun openClean(mode: CleanMode) {
+    /** [keepScroll] is true when coming back from a folder, so the list stays where it was. */
+    fun openClean(mode: CleanMode, keepScroll: Boolean = false) {
+        if (!keepScroll) cleanStates.remove(mode)
         _clean.update { it.copy(mode = mode, selection = emptySet(), error = null) }
         when (mode) {
             CleanMode.Large -> if (_clean.value.scannedMin < 0) scanLarge(DEFAULT_LARGE_MIN)
@@ -525,7 +536,8 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun openMedia(kind: MediaKind) {
+    fun openMedia(kind: MediaKind, keepScroll: Boolean = false) {
+        if (!keepScroll) mediaStates.remove(kind)
         _media.update { it.copy(kind = kind) }
         val m = _media.value
         // Reuse the last result for a couple of minutes so reopening is instant.
@@ -552,7 +564,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
         mediaFilter = kind
         mediaFilterPath = path
         openFromHome(path)
-        if (kind != null) returnTo = { openMedia(kind) }
+        if (kind != null) returnTo = { openMedia(kind, keepScroll = true) }
     }
 
     fun clearMediaFilter() {
@@ -700,7 +712,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
         val mode = _clean.value.mode
         closeClean()
         openFromHome(parentPath(path))
-        if (mode != null) returnTo = { openClean(mode) }
+        if (mode != null) returnTo = { openClean(mode, keepScroll = true) }
     }
 
     // ---------- folders left behind by uninstalled apps ----------

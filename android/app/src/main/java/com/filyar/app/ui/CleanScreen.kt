@@ -91,6 +91,7 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
     val mode = c.mode ?: return
     BackHandler { vm.closeClean() }
 
+    val listState = vm.cleanListState(mode)
     var confirm by remember { mutableStateOf<List<RemoteFile>?>(null) }
     var infoDialog by remember { mutableStateOf<Pair<RemoteFile, ApkInfo?>?>(null) }
     var minBytes by remember { mutableLongStateOf(BrowserViewModel.DEFAULT_LARGE_MIN) }
@@ -249,7 +250,7 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                 mode == CleanMode.Large -> if (shown.isEmpty() && !c.scanning) {
                     StateMessage(Icons.Filled.SdStorage, "فایل بزرگی پیدا نشد", "حد حجم را کمتر کنید.")
                 } else {
-                    LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 100.dp)) {
+                    LazyColumn(state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 100.dp)) {
                         items(shown, key = { it.path }) { f ->
                             CleanRow(f, backend, vm.rootPath, f.path in c.selection, null) { vm.cleanToggle(f.path) }
                         }
@@ -258,7 +259,7 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                 mode == CleanMode.Apks -> if (c.apks.isEmpty() && !c.scanning) {
                     StateMessage(Icons.Filled.Android, "فایل برنامه‌ای پیدا نشد", "هیچ APK یا بسته‌ی نصبی در حافظه نیست.")
                 } else {
-                    LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 100.dp)) {
+                    LazyColumn(state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 100.dp)) {
                         items(c.apks, key = { it.path }) { f ->
                             var info by remember(f.path, f.lastModified) { mutableStateOf<ApkInfo?>(null) }
                             LaunchedEffect(f.path, f.lastModified) { info = vm.apkInfo(f) }
@@ -279,7 +280,7 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                 mode == CleanMode.Leftovers -> if (c.leftovers.isEmpty() && !c.scanning) {
                     StateMessage(Icons.Filled.FolderOff, "پوشه‌ی باقی‌مانده‌ای نیست", "همه‌ی پوشه‌های Android/data و Android/obb مال برنامه‌های نصب‌شده‌اند.")
                 } else {
-                    LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 100.dp)) {
+                    LazyColumn(state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 100.dp)) {
                         items(c.leftovers, key = { it.path }) { f ->
                             CleanRow(f, backend, vm.rootPath, f.path in c.selection, null, showLocation = true) { vm.cleanToggle(f.path) }
                         }
@@ -288,7 +289,7 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                 mode == CleanMode.Recent -> if (c.recent.isEmpty() && !c.scanning) {
                     StateMessage(Icons.Filled.History, "فایل اخیری پیدا نشد", "فایل‌هایی که تازه ساخته یا تغییر کرده‌اند اینجا نشان داده می‌شوند.")
                 } else {
-                    LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 32.dp)) {
+                    LazyColumn(state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 32.dp)) {
                         items(c.recent, key = { it.path }) { f ->
                             RecentRow(f, backend, vm.rootPath, onOpen = { vm.open(f) }, onFolder = { vm.showInFolder(f.path) })
                         }
@@ -297,7 +298,7 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                 else -> if (c.groups.isEmpty() && !c.scanning) {
                     StateMessage(Icons.Filled.FileCopy, "فایل تکراری پیدا نشد", "فایل‌های هم‌اندازه و هم‌محتوا اینجا گروه‌بندی می‌شوند.")
                 } else {
-                    LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 100.dp)) {
+                    LazyColumn(state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 100.dp)) {
                         c.groups.forEachIndexed { i, g ->
                             item(key = "h$i") {
                                 Column {

@@ -101,7 +101,7 @@ fun MediaFoldersScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
             when {
                 m.error != null && !m.scanning && folders.isEmpty() -> StateMessage(kindIcon(kind), "جستجو ممکن نشد", m.error)
                 folders.isEmpty() && !m.scanning -> StateMessage(kindIcon(kind), "پوشه‌ای پیدا نشد", "هیچ پوشه‌ای با این نوع فایل در حافظه نیست.")
-                else -> LazyColumn(contentPadding = PaddingValues(bottom = 32.dp)) {
+                else -> LazyColumn(state = vm.mediaListState(kind), contentPadding = PaddingValues(bottom = 32.dp)) {
                     items(folders, key = { it.path }) { f ->
                         FolderRow(f, vm, root) { vm.showMediaFolder(f.path) }
                     }

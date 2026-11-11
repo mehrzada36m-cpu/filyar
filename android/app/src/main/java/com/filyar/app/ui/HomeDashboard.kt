@@ -1,5 +1,7 @@
 package com.filyar.app.ui
 
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Backup
@@ -108,11 +110,12 @@ fun HomeDashboard(
     style: HomeStyle = HomeStyle.Cards,
     onOpenMedia: (MediaKind) -> Unit = {},
     onOpenBackups: () -> Unit = {},
+    listState: LazyListState = rememberLazyListState(),
 ) {
     if (style == HomeStyle.Classic) {
-        ClassicHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onGrantLocal, onRemoveQuick, onAddQuick, onCustomizeQuick, onOpenCleaner, onOpenMedia, onOpenBackups)
+        ClassicHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onGrantLocal, onRemoveQuick, onAddQuick, onCustomizeQuick, onOpenCleaner, onOpenMedia, onOpenBackups, listState)
     } else {
-        CardsHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onShizukuAction, onShowGuide, onGrantLocal, onRemoveQuick, onAddQuick, onCustomizeQuick, onOpenCleaner, onOpenBackups)
+        CardsHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onShizukuAction, onShowGuide, onGrantLocal, onRemoveQuick, onAddQuick, onCustomizeQuick, onOpenCleaner, onOpenBackups, listState)
     }
 }
 
@@ -132,10 +135,11 @@ private fun CardsHome(
     onCustomizeQuick: (String) -> Unit,
     onOpenCleaner: (CleanMode) -> Unit,
     onOpenBackups: () -> Unit,
+    listState: LazyListState,
 ) {
     var cleanerOpen by rememberSaveable { mutableStateOf(false) }
 
-    LazyColumn(contentPadding = PaddingValues(top = 4.dp, bottom = 32.dp)) {
+    LazyColumn(state = listState, contentPadding = PaddingValues(top = 4.dp, bottom = 32.dp)) {
         // Shizuku's state lives in the header text now; tapping it when it is off starts the setup.
 
         if (!localAccess && shizuku != ShizukuStatus.Ready) {
@@ -597,6 +601,7 @@ private fun ClassicHome(
     onOpenCleaner: (CleanMode) -> Unit,
     onOpenMedia: (MediaKind) -> Unit,
     onOpenBackups: () -> Unit,
+    listState: LazyListState,
 ) {
     val scheme = MaterialTheme.colorScheme
     val total = storage?.getOrNull(0) ?: 0L
@@ -608,7 +613,7 @@ private fun ClassicHome(
     val purple = Color(0xFF7C6BE0)
     val amber = Color(0xFFD98A1B)
 
-    LazyColumn(contentPadding = PaddingValues(top = 0.dp, bottom = 32.dp)) {
+    LazyColumn(state = listState, contentPadding = PaddingValues(top = 0.dp, bottom = 32.dp)) {
         if (!localAccess && shizuku != ShizukuStatus.Ready) {
             item(key = "local") {
                 Spacer(Modifier.height(8.dp))
