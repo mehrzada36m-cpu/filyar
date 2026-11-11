@@ -235,19 +235,44 @@ private fun accentScheme(base: ColorScheme, accent: Color, dark: Boolean): Color
         )
     }
 
+/**
+ * Re-colours the app background and the card surfaces built on it. The raised surfaces are derived from
+ * the new background so cards stay visible against it.
+ */
+private fun withBackground(s: ColorScheme, index: Int, dark: Boolean): ColorScheme {
+    val bg = when {
+        index == -2 -> if (dark) Color.Black else Color.White
+        else -> {
+            val hue = AccentColors.getOrNull(index) ?: return s
+            lerp(s.background, hue, if (dark) 0.14f else 0.09f)
+        }
+    }
+    val toward = if (dark) Color.White else Color.Black
+    return s.copy(
+        background = bg,
+        surface = bg,
+        surfaceContainerLowest = bg,
+        surfaceContainerLow = lerp(bg, toward, if (dark) 0.05f else 0.04f),
+        surfaceContainer = lerp(bg, toward, if (dark) 0.08f else 0.06f),
+        surfaceContainerHigh = lerp(bg, toward, if (dark) 0.11f else 0.09f),
+        surfaceContainerHighest = lerp(bg, toward, if (dark) 0.14f else 0.12f),
+    )
+}
+
 @Composable
-fun FilyarTheme(mode: ThemeMode = ThemeMode.System, dynamic: Boolean = false, accent: Int = -1, content: @Composable () -> Unit) {
+fun FilyarTheme(mode: ThemeMode = ThemeMode.System, dynamic: Boolean = false, accent: Int = -1, background: Int = -1, content: @Composable () -> Unit) {
     val dark = isDarkTheme(mode)
     val context = LocalContext.current
     val useDynamic = dynamic && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val accentColor = if (useDynamic) null else AccentColors.getOrNull(accent)
-    val scheme = when {
+    val picked = when {
         useDynamic && dark -> dynamicDarkColorScheme(context)
         useDynamic -> dynamicLightColorScheme(context)
         accentColor != null -> accentScheme(if (dark) DarkColors else LightColors, accentColor, dark)
         dark -> DarkColors
         else -> LightColors
     }
+    val scheme = if (background == -1) picked else withBackground(picked, background, dark)
     val base = if (dark) DarkTokens else LightTokens
     // With wallpaper colours, folders and the header card follow the wallpaper palette too.
     val tokens = if (!useDynamic && accentColor == null) base else base.copy(

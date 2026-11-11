@@ -781,7 +781,7 @@ private fun FolderContent(
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(LocalViewPrefs.current.let { it.itemSize.gridCell * maxOf(1f, it.fileScale, it.folderScale) }),
                     state = gridState,
-                    contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 120.dp),
+                    contentPadding = LocalViewPrefs.current.itemGap.let { g -> PaddingValues(start = 8.dp * g, end = 8.dp * g, top = 4.dp * g, bottom = 120.dp) },
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     items(st.items, key = { it.path }) { f ->

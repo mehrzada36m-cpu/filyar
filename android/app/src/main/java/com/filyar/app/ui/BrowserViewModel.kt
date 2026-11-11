@@ -132,6 +132,9 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     /** Folder opened from the home screen; going back from it returns straight home. */
     private var homeAnchor: String? = null
 
+    /** Set when a folder was opened from a list screen (media, apk files): "back" returns there instead of home. */
+    private var returnTo: (() -> Unit)? = null
+
     private val _clip = MutableStateFlow<Clip?>(null)
     val clip: StateFlow<Clip?> = _clip.asStateFlow()
 
@@ -196,13 +199,17 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Opens a folder from the home screen so that "back" returns to home, not to its parent. */
     fun openFromHome(path: String) {
+        returnTo = null
         navigate(path)
         homeAnchor = path
     }
 
     fun navigate(path: String?) {
         val anchor = homeAnchor
-        if (path == null || (anchor != null && path != anchor && !path.startsWith("$anchor/"))) homeAnchor = null
+        if (path == null || (anchor != null && path != anchor && !path.startsWith("$anchor/"))) {
+            homeAnchor = null
+            returnTo = null
+        }
         _state.update {
             it.copy(path = path, selection = emptySet(), searchQuery = null, searchResults = emptyList(), items = emptyList())
         }
@@ -211,7 +218,13 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
 
     fun goUp(): Boolean {
         val p = _state.value.path ?: return false
-        if (p == homeAnchor || p == rootPath || !p.startsWith(rootPath)) navigate(null) else navigate(parentPath(p))
+        if (p == homeAnchor || p == rootPath || !p.startsWith(rootPath)) {
+            val back = if (p == homeAnchor) returnTo else null
+            navigate(null)
+            back?.invoke()
+        } else {
+            navigate(parentPath(p))
+        }
         return true
     }
 
@@ -487,8 +500,10 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Leaves the media list and shows [path], so "back" returns home. */
     fun showMediaFolder(path: String) {
+        val kind = _media.value.kind
         closeMedia()
         openFromHome(path)
+        if (kind != null) returnTo = { openMedia(kind) }
     }
 
     fun scanMedia() {
@@ -558,8 +573,10 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Leaves the clean screen and shows the folder that holds [path], so "back" returns home. */
     fun showInFolder(path: String) {
+        val mode = _clean.value.mode
         closeClean()
         openFromHome(parentPath(path))
+        if (mode != null) returnTo = { openClean(mode) }
     }
 
     fun scanDuplicates() {

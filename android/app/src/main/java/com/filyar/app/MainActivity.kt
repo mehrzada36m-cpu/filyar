@@ -71,7 +71,7 @@ class MainActivity : ComponentActivity() {
                 )
                 onDispose {}
             }
-            FilyarTheme(vp.theme, vp.dynamicColor, vp.accent) {
+            FilyarTheme(vp.theme, vp.dynamicColor, vp.accent, vp.bgColor) {
                 CompositionLocalProvider(
                     LocalLayoutDirection provides LayoutDirection.Rtl,
                     LocalViewPrefs provides vp,

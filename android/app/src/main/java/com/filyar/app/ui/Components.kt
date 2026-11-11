@@ -260,14 +260,15 @@ fun FileRow(
     val bg = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surface.copy(alpha = 0f)
     val shownIcon = iconSize * iconScaleFor(f)
     val compact = shownIcon < 42.dp
+    val gap = LocalViewPrefs.current.itemGap
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = if (compact) 1.dp else 2.dp)
+            .padding(horizontal = 8.dp * gap, vertical = (if (compact) 1.dp else 2.dp) * gap)
             .clip(RoundedCornerShape(18.dp))
             .background(bg)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(start = 10.dp, end = 2.dp, top = if (compact) 4.dp else 8.dp, bottom = if (compact) 4.dp else 8.dp)
+            .padding(start = 10.dp, end = 2.dp, top = (if (compact) 4.dp else 8.dp) * gap, bottom = (if (compact) 4.dp else 8.dp) * gap)
             .alpha(if (f.isHidden) 0.6f else 1f),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -318,16 +319,16 @@ fun FileGridItem(
     val bg = if (selected) scheme.primaryContainer.copy(alpha = 0.6f) else card
     Column(
         Modifier
-            .padding(4.dp)
+            .padding(4.dp * prefs.itemGap)
             .clip(RoundedCornerShape(20.dp))
             .background(bg)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(10.dp)
+            .padding(10.dp * prefs.itemGap)
             .alpha(if (f.isHidden) 0.6f else 1f),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         FileIcon(f, backend, iconSize, selected)
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(8.dp * prefs.itemGap))
         Text(
             f.name,
             style = MaterialTheme.typography.labelMedium,

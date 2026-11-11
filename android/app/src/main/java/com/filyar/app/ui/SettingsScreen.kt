@@ -1,5 +1,6 @@
 package com.filyar.app.ui
 
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.lerp
 import kotlin.math.roundToInt
 import com.filyar.app.core.faNum
@@ -96,6 +97,8 @@ fun SettingsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onBack: ()
                 options = listOf(HomeStyle.Cards to "کارتی (فعلی)", HomeStyle.Classic to "کلاسیک"),
                 selected = vp.homeStyle,
             ) { h -> vm.updateView { it.copy(homeStyle = h) } }
+            Label("رنگ پس‌زمینه‌ی برنامه")
+            BackgroundPicker(selected = vp.bgColor) { c -> vm.updateView { it.copy(bgColor = c) } }
             val dynamicOn = vp.dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
             Label(if (dynamicOn) "رنگ اصلی (با رنگ پویا خاموش می‌شود)" else "رنگ اصلی")
             AccentPicker(selected = vp.accent, enabled = !dynamicOn) { a -> vm.updateView { it.copy(accent = a) } }
@@ -116,6 +119,7 @@ fun SettingsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onBack: ()
             ) { sz -> vm.updateView { it.copy(itemSize = sz) } }
             ScaleSlider("اندازه‌ی آیکون فایل‌ها", vp.fileScale) { v -> vm.updateView { it.copy(fileScale = v) } }
             ScaleSlider("اندازه‌ی آیکون پوشه‌ها", vp.folderScale) { v -> vm.updateView { it.copy(folderScale = v) } }
+            ScaleSlider("فاصله‌ی بین آیتم‌ها", vp.itemGap, range = 0f..1.6f, steps = 7) { v -> vm.updateView { it.copy(itemGap = v) } }
             Label("مدل پوشه")
             FolderModelPicker(selected = vp.folderModel) { m -> vm.updateView { it.copy(folderModel = m) } }
             Label("چیدمان پیش‌فرض پوشه‌ها")
@@ -286,7 +290,13 @@ private fun FolderModelPicker(selected: FolderModel, onSelect: (FolderModel) -> 
 }
 
 @Composable
-private fun ScaleSlider(title: String, value: Float, onCommit: (Float) -> Unit) {
+private fun ScaleSlider(
+    title: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float> = 0.7f..1.6f,
+    steps: Int = 8,
+    onCommit: (Float) -> Unit,
+) {
     var live by remember(value) { mutableFloatStateOf(value) }
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -301,8 +311,8 @@ private fun ScaleSlider(title: String, value: Float, onCommit: (Float) -> Unit) 
             value = live,
             onValueChange = { live = it },
             onValueChangeFinished = { onCommit(live) },
-            valueRange = 0.7f..1.6f,
-            steps = 8,
+            valueRange = range,
+            steps = steps,
         )
     }
 }
@@ -328,6 +338,40 @@ private fun CardColorPicker(selected: Int, enabled: Boolean, onSelect: (Int) -> 
                     .background(swatch.copy(alpha = if (enabled) 1f else 0.4f))
                     .border(if (sel) 3.dp else 1.dp, if (sel) scheme.primary else scheme.outlineVariant, CircleShape)
                     .clickable(enabled = enabled) { onSelect(i) },
+                contentAlignment = Alignment.Center,
+            ) {
+                if (sel) Icon(Icons.Filled.Check, null, tint = scheme.primary)
+            }
+        }
+    }
+}
+
+@Composable
+private fun BackgroundPicker(selected: Int, onSelect: (Int) -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val dark = scheme.background.luminance() < 0.5f
+    // -1 theme default, -2 pure white or black, then one tint per palette colour.
+    val options = listOf(-1, -2) + AccentColors.indices.toList()
+    Row(
+        Modifier
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        options.forEach { i ->
+            val swatch = when (i) {
+                -1 -> scheme.surfaceContainerHigh
+                -2 -> if (dark) Color.Black else Color.White
+                else -> lerp(if (dark) Color(0xFF14181A) else Color(0xFFF4F7F6), AccentColors[i], if (dark) 0.3f else 0.22f)
+            }
+            val sel = i == selected
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(swatch)
+                    .border(if (sel) 3.dp else 1.dp, if (sel) scheme.primary else scheme.outlineVariant, CircleShape)
+                    .clickable { onSelect(i) },
                 contentAlignment = Alignment.Center,
             ) {
                 if (sel) Icon(Icons.Filled.Check, null, tint = scheme.primary)
