@@ -77,6 +77,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.filyar.app.core.ShizukuStatus
 import com.filyar.app.core.formatSize
+import com.filyar.app.core.faNum
 import com.filyar.app.ui.theme.Filyar
 
 /** Persian names for the default quick access folders. */
