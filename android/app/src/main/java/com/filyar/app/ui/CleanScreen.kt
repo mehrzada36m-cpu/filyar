@@ -1,5 +1,17 @@
 package com.filyar.app.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.sp
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.FolderOff
@@ -80,6 +92,7 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
     BackHandler { vm.closeClean() }
 
     var confirm by remember { mutableStateOf<List<RemoteFile>?>(null) }
+    var infoDialog by remember { mutableStateOf<Pair<RemoteFile, ApkInfo?>?>(null) }
     var minBytes by remember { mutableLongStateOf(BrowserViewModel.DEFAULT_LARGE_MIN) }
     var custom by remember { mutableStateOf("") }
     val backend = vm.backend
@@ -249,13 +262,17 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                         items(c.apks, key = { it.path }) { f ->
                             var info by remember(f.path, f.lastModified) { mutableStateOf<ApkInfo?>(null) }
                             LaunchedEffect(f.path, f.lastModified) { info = vm.apkInfo(f) }
-                            CleanRow(
-                                f, backend, vm.rootPath, f.path in c.selection, null,
-                                showLocation = true,
-                                onOpenFolder = { vm.showInFolder(f.path) },
-                                info = info,
+                            val selecting = c.selection.isNotEmpty()
+                            ApkRow(
+                                f, backend, info,
+                                checked = f.path in c.selection,
+                                selectionMode = selecting,
+                                onClick = { if (selecting) vm.cleanToggle(f.path) else vm.openExternal(f, chooser = false) },
+                                onLongClick = { vm.cleanToggle(f.path) },
+                                onInfo = { infoDialog = f to info },
                                 onInstall = if (f.extension == "apk") ({ vm.openExternal(f, chooser = false) }) else null,
-                            ) { vm.cleanToggle(f.path) }
+                                onFolder = { vm.showInFolder(f.path) },
+                            )
                         }
                     }
                 }
@@ -304,6 +321,10 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                 }
             }
         }
+    }
+
+    infoDialog?.let { (file, inf) ->
+        ApkInfoDialog(file, inf, vm.rootPath) { infoDialog = null }
     }
 
     confirm?.let { items ->
@@ -374,8 +395,6 @@ private fun CleanRow(
     tag: String?,
     showLocation: Boolean = false,
     onOpenFolder: (() -> Unit)? = null,
-    info: ApkInfo? = null,
-    onInstall: (() -> Unit)? = null,
     onToggle: () -> Unit,
 ) {
     Row(
@@ -416,24 +435,7 @@ private fun CleanRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (info != null) {
-                Text(
-                    "${info.label} • ${info.pkg}",
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                val (status, color) = apkStatus(info)
-                Text(
-                    "نسخه ${info.versionName.ifEmpty { "؟" }} (${faNum(info.versionCode)}) • $status",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = color,
-                )
-            }
             if (tag != null) Text(tag, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-        }
-        if (onInstall != null) {
-            IconButton(onClick = onInstall) { Icon(Icons.Filled.SystemUpdate, "نصب") }
         }
         if (onOpenFolder != null) {
             IconButton(onClick = onOpenFolder) { Icon(Icons.Filled.FolderOpen, "نمایش در پوشه") }
@@ -481,5 +483,112 @@ private fun RecentRow(f: RemoteFile, backend: FileBackend, root: String, onOpen:
             )
         }
         IconButton(onClick = onFolder) { Icon(Icons.Filled.FolderOpen, "نمایش در پوشه") }
+    }
+}
+
+/**
+ * One installable app file. It shows only the app's name and version; everything else sits behind the
+ * info button. The checkbox only appears once a long press has started a selection.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ApkRow(
+    f: RemoteFile,
+    backend: FileBackend,
+    info: ApkInfo?,
+    checked: Boolean,
+    selectionMode: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    onInfo: () -> Unit,
+    onInstall: (() -> Unit)?,
+    onFolder: () -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(start = 12.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (selectionMode) {
+            Checkbox(checked = checked, onCheckedChange = { onClick() })
+        }
+        Box {
+            FileIcon(f, backend, 46.dp, selected = false)
+            if (info?.installedCode != null) {
+                Text(
+                    "نصب شده",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, lineHeight = 10.sp),
+                    color = scheme.onPrimary,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .offset(y = 5.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(scheme.primary)
+                        .padding(horizontal = 5.dp, vertical = 1.dp),
+                )
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(info?.label ?: f.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                if (info != null) "نسخه ${info.versionName.ifEmpty { "؟" }}" else f.extension.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = scheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+        // The three actions share one capsule so the row stays slim.
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .background(scheme.surfaceContainerHigh),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CapsuleAction(Icons.Filled.Info, "اطلاعات برنامه", onInfo)
+            if (onInstall != null) CapsuleAction(Icons.Filled.SystemUpdate, "نصب", onInstall)
+            CapsuleAction(Icons.Filled.FolderOpen, "نمایش در پوشه", onFolder)
+        }
+    }
+}
+
+@Composable
+private fun CapsuleAction(icon: ImageVector, description: String, onClick: () -> Unit) {
+    IconButton(onClick = onClick, modifier = Modifier.size(38.dp)) {
+        Icon(icon, description, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun ApkInfoDialog(f: RemoteFile, info: ApkInfo?, root: String, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(info?.label ?: f.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                InfoLine("نام فایل", f.name)
+                if (info != null) {
+                    InfoLine("نام بسته", info.pkg)
+                    InfoLine("نسخه", "${info.versionName.ifEmpty { "؟" }} (${faNum(info.versionCode)})")
+                    val (status, color) = apkStatus(info)
+                    InfoLine("وضعیت", status, color)
+                }
+                InfoLine("حجم", formatSize(f.size))
+                InfoLine("آخرین ویرایش", formatDate(f.lastModified))
+                InfoLine("پوشه", f.parent.removePrefix(root).trimStart('/').ifEmpty { "حافظه داخلی" })
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("بستن") } },
+    )
+}
+
+@Composable
+private fun InfoLine(label: String, value: String, color: Color = MaterialTheme.colorScheme.onSurface) {
+    Column {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = color)
     }
 }

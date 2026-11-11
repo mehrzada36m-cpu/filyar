@@ -458,6 +458,7 @@ private fun QuickTile(
     onClick: () -> Unit,
     onCustomize: () -> Unit,
     onRemove: () -> Unit,
+    card: Boolean = true,
 ) {
     var menu by remember { mutableStateOf(false) }
     val rel = path.removePrefix(rootPath).trimStart('/')
@@ -467,7 +468,7 @@ private fun QuickTile(
     Box(
         modifier
             .clip(RoundedCornerShape(22.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .then(if (card) Modifier.background(MaterialTheme.colorScheme.surfaceContainerLow) else Modifier)
             .combinedClickable(onClick = onClick, onLongClick = { menu = true }),
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -657,6 +658,7 @@ private fun ClassicHome(
                         onClick = { onOpen(path) },
                         onCustomize = { onCustomizeQuick(path) },
                         onRemove = { onRemoveQuick(path) },
+                        card = false,
                     )
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
