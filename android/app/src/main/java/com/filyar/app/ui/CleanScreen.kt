@@ -458,7 +458,7 @@ private fun apkStatus(info: ApkInfo): Pair<String, androidx.compose.ui.graphics.
 }
 
 @Composable
-private fun RecentRow(f: RemoteFile, backend: FileBackend, root: String, onOpen: () -> Unit, onFolder: () -> Unit) {
+fun RecentRow(f: RemoteFile, backend: FileBackend, root: String, onOpen: () -> Unit, onFolder: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()

@@ -173,6 +173,8 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
     val quickAccess by vm.quickAccess.collectAsStateWithLifecycle()
     val folderStyles by vm.folderStyles.collectAsStateWithLifecycle()
     val folderLayouts by vm.folderLayouts.collectAsStateWithLifecycle()
+    val stats by vm.stats.collectAsStateWithLifecycle()
+    LaunchedEffect(st.path == null) { if (st.path == null) vm.refreshStats() }
     val curPath = st.path
     val gridHere = curPath?.let { folderLayouts[it] } ?: vp.grid
     val layoutOverridden = curPath != null && folderLayouts.containsKey(curPath)
@@ -312,6 +314,8 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
                     onOpenMedia = { vm.openMedia(it) },
                     onOpenBackups = { vm.openBackups() },
                     listState = vm.homeListState,
+                    stats = stats,
+                    onOpenApps = { vm.openApps() },
                 )
                 else -> {
                     Breadcrumbs(path, vm.rootPath) { vm.navigate(it) }

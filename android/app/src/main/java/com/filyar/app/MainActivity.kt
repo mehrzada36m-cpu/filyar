@@ -1,5 +1,7 @@
 package com.filyar.app
 
+import com.filyar.app.ui.AppsScreen
+import com.filyar.app.ui.FileListScreen
 import com.filyar.app.ui.MediaFoldersScreen
 import android.content.ActivityNotFoundException
 import android.os.Bundle
@@ -51,6 +53,8 @@ private sealed interface Screen {
     data object Settings : Screen
     data object Clean : Screen
     data object Media : Screen
+    data object Listing : Screen
+    data object Apps : Screen
 }
 
 class MainActivity : ComponentActivity() {
@@ -96,9 +100,13 @@ private fun AppRoot(vm: BrowserViewModel) {
     var base by remember { mutableStateOf<Screen>(Screen.Browser) }
     val clean by vm.clean.collectAsStateWithLifecycle()
     val media by vm.media.collectAsStateWithLifecycle()
+    val listing by vm.listing.collectAsStateWithLifecycle()
+    val appsOpen by vm.appsOpen.collectAsStateWithLifecycle()
     val screen: Screen = when {
+        base == Screen.Browser && listing != null -> Screen.Listing
         base == Screen.Browser && media.kind != null -> Screen.Media
         base == Screen.Browser && clean.mode != null -> Screen.Clean
+        base == Screen.Browser && appsOpen -> Screen.Apps
         else -> base
     }
     val snackbar = remember { SnackbarHostState() }
@@ -134,6 +142,8 @@ private fun AppRoot(vm: BrowserViewModel) {
             Screen.Browser -> BrowserScreen(vm, snackbar) { base = Screen.Settings }
             Screen.Clean -> CleanScreen(vm, snackbar)
             Screen.Media -> MediaFoldersScreen(vm, snackbar)
+            Screen.Listing -> FileListScreen(vm, snackbar)
+            Screen.Apps -> AppsScreen(vm, snackbar)
             Screen.Settings -> SettingsScreen(vm, snackbar) { base = Screen.Browser }
             is Screen.Editor -> EditorScreen(s.file, vm, snackbar) { base = Screen.Browser }
             is Screen.Viewer -> ImageViewerScreen(s.file, vm) { base = Screen.Browser }

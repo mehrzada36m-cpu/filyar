@@ -1,5 +1,29 @@
 package com.filyar.app.ui
 
+import kotlin.math.roundToInt
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.clip
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Headset
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Alarm
+import androidx.compose.material.icons.filled.Album
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -58,6 +82,9 @@ fun MediaFoldersScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
     val kind = m.kind ?: return
     BackHandler { vm.closeMedia() }
     val root = vm.rootPath
+    val stats by vm.stats.collectAsStateWithLifecycle()
+    val storage by vm.storage.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { vm.refreshStats() }
 
     val folders = remember(m.folders, kind, m.includeHidden) {
         m.folders[kind].orEmpty()
@@ -98,13 +125,29 @@ fun MediaFoldersScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                     label = { Text("شامل Android/data و پوشه‌های مخفی") },
                 )
             }
-            when {
-                m.error != null && !m.scanning && folders.isEmpty() -> StateMessage(kindIcon(kind), "جستجو ممکن نشد", m.error)
-                folders.isEmpty() && !m.scanning -> StateMessage(kindIcon(kind), "پوشه‌ای پیدا نشد", "هیچ پوشه‌ای با این نوع فایل در حافظه نیست.")
-                else -> LazyColumn(state = vm.mediaListState(kind), contentPadding = PaddingValues(bottom = 32.dp)) {
-                    items(folders, key = { it.path }) { f ->
-                        FolderRow(f, vm, root) { vm.showMediaFolder(f.path) }
+            LazyColumn(state = vm.mediaListState(kind), contentPadding = PaddingValues(bottom = 32.dp)) {
+                item(key = "header") {
+                    if (kind == MediaKind.Audio) {
+                        AudioCategories(stats, vm)
+                    } else {
+                        UsageHeader(kind, stats, storage) { vm.openAllMedia(kind) }
                     }
+                }
+                item(key = "foldersTitle") {
+                    Text(
+                        "پوشه‌ها",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp),
+                    )
+                }
+                if (m.error != null && !m.scanning && folders.isEmpty()) {
+                    item(key = "error") { EmptyNote(m.error ?: "") }
+                } else if (folders.isEmpty() && !m.scanning) {
+                    item(key = "empty") { EmptyNote("هیچ پوشه‌ای با این نوع فایل در حافظه نیست.") }
+                }
+                items(folders, key = { it.path }) { f ->
+                    FolderRow(f, vm, root) { vm.showMediaFolder(f.path) }
                 }
             }
         }
@@ -143,6 +186,139 @@ private fun FolderRow(f: MediaFolderInfo, vm: BrowserViewModel, root: String, on
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+    }
+}
+
+@Composable
+private fun EmptyNote(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+    )
+}
+
+private fun percent(part: Long, total: Long): String {
+    if (total <= 0L || part <= 0L) return "${faNum(0)}٪"
+    val p = part * 100.0 / total
+    return if (p < 1.0) "<${faNum(1)}٪" else "${faNum(p.roundToInt())}٪"
+}
+
+/** How much of the storage this kind of file takes, as a donut with a legend, plus a "view all" button. */
+@Composable
+private fun UsageHeader(kind: MediaKind, stats: MediaStats, storage: LongArray?, onViewAll: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val total = storage?.getOrNull(0) ?: 0L
+    val free = storage?.getOrNull(1) ?: 0L
+    val kindBytes = if (kind == MediaKind.Images) stats.imageBytes else stats.videoBytes
+    if (total <= 0L) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+            TextButton(onClick = onViewAll) { Text("مشاهده‌ی همه‌ی ${kind.title}") }
+        }
+        return
+    }
+    val other = (total - free - kindBytes).coerceAtLeast(0L)
+    val parts = listOf(kindBytes, other, free)
+    val colors = listOf(scheme.primary, scheme.outline, scheme.surfaceVariant)
+    val labels = listOf(
+        "${kind.title} (${formatSize(kindBytes)})",
+        "سایر فایل‌ها (${formatSize(other)})",
+        "فضای خالی (${formatSize(free)})",
+    )
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Canvas(Modifier.size(92.dp)) {
+            val stroke = 16.dp.toPx()
+            var start = -90f
+            parts.forEachIndexed { i, v ->
+                val sweep = 360f * v / total
+                drawArc(
+                    color = colors[i],
+                    startAngle = start,
+                    sweepAngle = sweep,
+                    useCenter = false,
+                    topLeft = Offset(stroke / 2, stroke / 2),
+                    size = Size(size.width - stroke, size.height - stroke),
+                    style = Stroke(stroke),
+                )
+                start += sweep
+            }
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            parts.forEachIndexed { i, v ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(10.dp).clip(CircleShape).background(colors[i]))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "${percent(v, total)}  ${labels[i]}",
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        TextButton(onClick = onViewAll) { Text("مشاهده‌ی همه") }
+    }
+}
+
+private class AudioCat(
+    val title: String,
+    val icon: ImageVector,
+    val color: Color,
+    val count: Int,
+    val onClick: () -> Unit,
+)
+
+/** The music screen's shortcuts: artists, albums, all tracks, and the alarm/ringtone/notification/podcast lists. */
+@Composable
+private fun AudioCategories(stats: MediaStats, vm: BrowserViewModel) {
+    val cats = listOf(
+        AudioCat("هنرمندان", Icons.Filled.Mic, Color(0xFF3FA34D), stats.artists) { vm.openAudioGroups(true) },
+        AudioCat("آلبوم‌ها", Icons.Filled.Album, Color(0xFF14A38B), stats.albums) { vm.openAudioGroups(false) },
+        AudioCat("همه‌ی آهنگ‌ها", Icons.Filled.PlayArrow, Color(0xFF1EA7D6), stats.tracks) { vm.openAudioList(AudioList.Tracks) },
+        AudioCat("زنگ هشدار", Icons.Filled.Alarm, Color(0xFFE91E63), stats.alarms) { vm.openAudioList(AudioList.Alarms) },
+        AudioCat("زنگ تماس", Icons.Filled.Call, Color(0xFF6C4DD3), stats.ringtones) { vm.openAudioList(AudioList.Ringtones) },
+        AudioCat("اعلان‌ها", Icons.Filled.Notifications, Color(0xFF9C27B0), stats.notifications) { vm.openAudioList(AudioList.Notifications) },
+        AudioCat("پادکست‌ها", Icons.Filled.Headset, Color(0xFF3F51B5), stats.podcasts) { vm.openAudioList(AudioList.Podcasts) },
+    )
+    Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp)) {
+        cats.chunked(3).forEach { row ->
+            Row(Modifier.fillMaxWidth()) {
+                row.forEach { c ->
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable(onClick = c.onClick)
+                            .padding(vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Box(Modifier.size(56.dp).clip(CircleShape).background(c.color), contentAlignment = Alignment.Center) {
+                            Icon(c.icon, null, tint = Color.White)
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(c.title, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            if (c.count > 0) faNum(c.count) else "هیچ",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                .padding(horizontal = 8.dp, vertical = 1.dp),
+                        )
+                    }
+                }
+                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
         }
     }
 }

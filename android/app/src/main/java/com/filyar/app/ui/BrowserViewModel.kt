@@ -1,5 +1,7 @@
 package com.filyar.app.ui
 
+import android.content.pm.ApplicationInfo
+import android.provider.Settings
 import androidx.compose.foundation.lazy.LazyListState
 import java.util.Locale
 import java.util.Date
@@ -90,6 +92,57 @@ enum class MediaKind(val title: String, val extensions: Set<String>) {
     Videos("ویدیوها", setOf("mp4", "mkv", "webm", "3gp", "avi", "mov", "flv", "m4v", "mpg", "mpeg", "wmv", "ts")),
     Audio("موسیقی", setOf("mp3", "m4a", "aac", "ogg", "opus", "wav", "flac", "amr", "wma", "mid", "midi")),
 }
+
+/** Totals shown on the home screen's media and apps tiles. */
+data class MediaStats(
+    val loaded: Boolean = false,
+    val images: Int = 0,
+    val imageBytes: Long = 0L,
+    val cameraImages: Int = 0,
+    val videos: Int = 0,
+    val videoBytes: Long = 0L,
+    val cameraVideos: Int = 0,
+    val tracks: Int = 0,
+    val audioBytes: Long = 0L,
+    val artists: Int = 0,
+    val albums: Int = 0,
+    val alarms: Int = 0,
+    val ringtones: Int = 0,
+    val notifications: Int = 0,
+    val podcasts: Int = 0,
+    val userApps: Int = 0,
+    val systemApps: Int = 0,
+)
+
+/** The flat audio lists on the music screen; [flag] is the media database column that selects them. */
+enum class AudioList(val title: String, val flag: String) {
+    Tracks("همه‌ی آهنگ‌ها", MediaStore.Audio.Media.IS_MUSIC),
+    Alarms("زنگ‌های هشدار", MediaStore.Audio.Media.IS_ALARM),
+    Ringtones("زنگ تماس", MediaStore.Audio.Media.IS_RINGTONE),
+    Notifications("اعلان‌ها", MediaStore.Audio.Media.IS_NOTIFICATION),
+    Podcasts("پادکست‌ها", MediaStore.Audio.Media.IS_PODCAST),
+}
+
+data class ListGroup(val key: Long, val title: String, val count: Int)
+
+/** A list screen on top of the media screen: either groups (artists, albums) or files. */
+data class ListingState(
+    val title: String,
+    val files: List<RemoteFile> = emptyList(),
+    val groups: List<ListGroup>? = null,
+    val byArtist: Boolean = false,
+    val loading: Boolean = true,
+    val error: String? = null,
+)
+
+data class AppEntry(
+    val pkg: String,
+    val label: String,
+    val versionName: String,
+    val isSystem: Boolean,
+    val apkSize: Long,
+    val sourceDir: String,
+)
 
 /** What an APK file says about itself, next to what is installed. */
 data class ApkInfo(
@@ -710,9 +763,14 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     /** Leaves the clean screen and shows the folder that holds [path], so "back" returns home. */
     fun showInFolder(path: String) {
         val mode = _clean.value.mode
+        val appsWereOpen = _appsOpen.value
         closeClean()
+        _appsOpen.value = false
         openFromHome(parentPath(path))
-        if (mode != null) returnTo = { openClean(mode, keepScroll = true) }
+        if (mode != null) returnTo = {
+            openClean(mode, keepScroll = true)
+            _appsOpen.value = appsWereOpen
+        }
     }
 
     // ---------- folders left behind by uninstalled apps ----------
@@ -883,6 +941,275 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
             withContext(Dispatchers.IO) { runCatching { backend.mkdirs(dir) } }
             openFromHome(dir)
         }
+    }
+
+    // ---------- statistics for the home tiles ----------
+    private val _stats = MutableStateFlow(MediaStats())
+    val stats: StateFlow<MediaStats> = _stats.asStateFlow()
+    private var statsAt = 0L
+
+    fun refreshStats(force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (!force && now - statsAt < 30_000) return
+        statsAt = now
+        viewModelScope.launch {
+            val s = withContext(Dispatchers.IO) { runCatching { computeStats() }.getOrNull() }
+            if (s != null) _stats.value = s
+        }
+    }
+
+    private fun isUserApp(ai: ApplicationInfo): Boolean =
+        (ai.flags and ApplicationInfo.FLAG_SYSTEM) == 0 || (ai.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+
+    private fun computeStats(): MediaStats {
+        val app = getApplication<Application>()
+        val resolver = app.contentResolver
+        val root = rootPath
+        var s = MediaStats(loaded = true)
+        for ((isImage, uri) in listOf(true to MediaStore.Images.Media.EXTERNAL_CONTENT_URI, false to MediaStore.Video.Media.EXTERNAL_CONTENT_URI)) {
+            var count = 0
+            var bytes = 0L
+            var camera = 0
+            runCatching {
+                resolver.query(uri, arrayOf(MediaStore.MediaColumns.DATA, MediaStore.MediaColumns.SIZE), null, null, null)?.use { c ->
+                    val iPath = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATA)
+                    val iSize = c.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
+                    while (c.moveToNext()) {
+                        val path = c.getString(iPath) ?: continue
+                        if (!path.startsWith("$root/")) continue
+                        count++
+                        bytes += c.getLong(iSize)
+                        if (path.contains("/DCIM/Camera/")) camera++
+                    }
+                }
+            }
+            s = if (isImage) s.copy(images = count, imageBytes = bytes, cameraImages = camera)
+            else s.copy(videos = count, videoBytes = bytes, cameraVideos = camera)
+        }
+        val artists = HashSet<Long>()
+        val albums = HashSet<Long>()
+        var tracks = 0
+        var audioBytes = 0L
+        var alarms = 0
+        var ringtones = 0
+        var notifications = 0
+        var podcasts = 0
+        runCatching {
+            val columns = arrayOf(
+                MediaStore.Audio.Media.DATA, MediaStore.Audio.Media.SIZE, MediaStore.Audio.Media.IS_MUSIC,
+                MediaStore.Audio.Media.IS_ALARM, MediaStore.Audio.Media.IS_RINGTONE, MediaStore.Audio.Media.IS_NOTIFICATION,
+                MediaStore.Audio.Media.IS_PODCAST, MediaStore.Audio.Media.ARTIST_ID, MediaStore.Audio.Media.ALBUM_ID,
+            )
+            resolver.query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, columns, null, null, null)?.use { c ->
+                val iPath = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
+                val iSize = c.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE)
+                val iMusic = c.getColumnIndexOrThrow(MediaStore.Audio.Media.IS_MUSIC)
+                val iAlarm = c.getColumnIndexOrThrow(MediaStore.Audio.Media.IS_ALARM)
+                val iRing = c.getColumnIndexOrThrow(MediaStore.Audio.Media.IS_RINGTONE)
+                val iNote = c.getColumnIndexOrThrow(MediaStore.Audio.Media.IS_NOTIFICATION)
+                val iPod = c.getColumnIndexOrThrow(MediaStore.Audio.Media.IS_PODCAST)
+                val iArtist = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST_ID)
+                val iAlbum = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
+                while (c.moveToNext()) {
+                    val path = c.getString(iPath) ?: continue
+                    if (!path.startsWith("$root/")) continue
+                    if (c.getInt(iMusic) != 0) {
+                        tracks++
+                        audioBytes += c.getLong(iSize)
+                        artists.add(c.getLong(iArtist))
+                        albums.add(c.getLong(iAlbum))
+                    }
+                    if (c.getInt(iAlarm) != 0) alarms++
+                    if (c.getInt(iRing) != 0) ringtones++
+                    if (c.getInt(iNote) != 0) notifications++
+                    if (c.getInt(iPod) != 0) podcasts++
+                }
+            }
+        }
+        s = s.copy(
+            tracks = tracks, audioBytes = audioBytes, artists = artists.size, albums = albums.size,
+            alarms = alarms, ringtones = ringtones, notifications = notifications, podcasts = podcasts,
+        )
+        val installed = runCatching { app.packageManager.getInstalledApplications(0) }.getOrDefault(emptyList())
+        val user = installed.count { isUserApp(it) }
+        return s.copy(userApps = user, systemApps = installed.size - user)
+    }
+
+    // ---------- lists on top of the media screen ----------
+    private val _listing = MutableStateFlow<ListingState?>(null)
+    val listing: StateFlow<ListingState?> = _listing.asStateFlow()
+    private val listingStack = ArrayList<ListingState>()
+    private var listingJob: Job? = null
+
+    private fun pushListing(next: ListingState) {
+        _listing.value?.let { listingStack.add(it) }
+        _listing.value = next
+    }
+
+    fun closeListing() {
+        listingJob?.cancel()
+        _listing.value = if (listingStack.isEmpty()) null else listingStack.removeAt(listingStack.size - 1)
+    }
+
+    private fun audioUri(): Uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+
+    fun openAllMedia(kind: MediaKind) {
+        val uri = when (kind) {
+            MediaKind.Images -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            MediaKind.Videos -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            MediaKind.Audio -> audioUri()
+        }
+        loadListing(ListingState("همه‌ی ${kind.title}")) { queryFiles(uri, null, null, LIST_LIMIT) }
+    }
+
+    fun openAudioList(list: AudioList) {
+        loadListing(ListingState(list.title)) { queryFiles(audioUri(), "${list.flag} != 0", null, LIST_LIMIT) }
+    }
+
+    fun openAudioGroups(byArtist: Boolean) {
+        pushListing(ListingState(if (byArtist) "هنرمندان" else "آلبوم‌ها", groups = emptyList(), byArtist = byArtist))
+        listingJob?.cancel()
+        listingJob = viewModelScope.launch {
+            val res = withContext(Dispatchers.IO) { runCatching { queryGroups(byArtist) } }
+            res.onSuccess { groups -> _listing.update { it?.copy(groups = groups, loading = false) } }
+                .onFailure { e ->
+                    if (e is CancellationException) throw e
+                    _listing.update { it?.copy(loading = false, error = e.message ?: "خواندن فهرست ممکن نشد") }
+                }
+        }
+    }
+
+    fun openGroup(g: ListGroup) {
+        val byArtist = _listing.value?.byArtist ?: true
+        val column = if (byArtist) MediaStore.Audio.Media.ARTIST_ID else MediaStore.Audio.Media.ALBUM_ID
+        loadListing(ListingState(g.title)) {
+            queryFiles(audioUri(), "$column = ? AND ${MediaStore.Audio.Media.IS_MUSIC} != 0", arrayOf(g.key.toString()), LIST_LIMIT)
+        }
+    }
+
+    private fun loadListing(initial: ListingState, load: () -> List<RemoteFile>) {
+        pushListing(initial)
+        listingJob?.cancel()
+        listingJob = viewModelScope.launch {
+            val res = withContext(Dispatchers.IO) { runCatching(load) }
+            res.onSuccess { files -> _listing.update { it?.copy(files = files, loading = false) } }
+                .onFailure { e ->
+                    if (e is CancellationException) throw e
+                    _listing.update { it?.copy(loading = false, error = e.message ?: "خواندن فهرست ممکن نشد") }
+                }
+        }
+    }
+
+    private fun queryGroups(byArtist: Boolean): List<ListGroup> {
+        val resolver = getApplication<Application>().contentResolver
+        val idCol = if (byArtist) MediaStore.Audio.Media.ARTIST_ID else MediaStore.Audio.Media.ALBUM_ID
+        val nameCol = if (byArtist) MediaStore.Audio.Media.ARTIST else MediaStore.Audio.Media.ALBUM
+        val names = HashMap<Long, String>()
+        val counts = HashMap<Long, Int>()
+        resolver.query(audioUri(), arrayOf(idCol, nameCol), "${MediaStore.Audio.Media.IS_MUSIC} != 0", null, null)?.use { c ->
+            val iId = c.getColumnIndexOrThrow(idCol)
+            val iName = c.getColumnIndexOrThrow(nameCol)
+            while (c.moveToNext()) {
+                val id = c.getLong(iId)
+                counts[id] = (counts[id] ?: 0) + 1
+                if (id !in names) names[id] = c.getString(iName)?.takeIf { it.isNotBlank() && it != "<unknown>" } ?: "نامشخص"
+            }
+        }
+        return counts.map { (id, n) -> ListGroup(id, names[id] ?: "نامشخص", n) }.sortedBy { it.title.lowercase() }
+    }
+
+    /** Files from the media database, newest first. Entries whose file is gone are skipped. */
+    private fun queryFiles(uri: Uri, selection: String?, args: Array<String>?, limit: Int): List<RemoteFile> {
+        val resolver = getApplication<Application>().contentResolver
+        val bundle = Bundle().apply {
+            if (selection != null) putString(ContentResolver.QUERY_ARG_SQL_SELECTION, selection)
+            if (args != null) putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, args)
+            putString(ContentResolver.QUERY_ARG_SQL_SORT_ORDER, "${MediaStore.MediaColumns.DATE_MODIFIED} DESC")
+            putInt(ContentResolver.QUERY_ARG_LIMIT, limit)
+        }
+        val out = ArrayList<RemoteFile>()
+        resolver.query(uri, arrayOf(MediaStore.MediaColumns.DATA), bundle, null)?.use { c ->
+            val iPath = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATA)
+            while (c.moveToNext()) {
+                val path = c.getString(iPath) ?: continue
+                val f = File(path)
+                if (!f.isFile) continue
+                out.add(RemoteFile(path, f.name, false, f.length(), f.lastModified(), 0, true, false))
+            }
+        }
+        return out
+    }
+
+    /** Shows a file's folder; "back" returns to the lists that were open. */
+    fun showListingFolder(path: String) {
+        val snap = _listing.value
+        val snapStack = listingStack.toList()
+        val mediaKind = _media.value.kind
+        listingJob?.cancel()
+        listingStack.clear()
+        _listing.value = null
+        _media.update { it.copy(kind = null) }
+        openFromHome(parentPath(path))
+        returnTo = {
+            _media.update { it.copy(kind = mediaKind) }
+            listingStack.clear()
+            listingStack.addAll(snapStack)
+            _listing.value = snap
+        }
+    }
+
+    // ---------- installed apps ----------
+    private val _appsOpen = MutableStateFlow(false)
+    val appsOpen: StateFlow<Boolean> = _appsOpen.asStateFlow()
+    private val _apps = MutableStateFlow<List<AppEntry>?>(null)
+    val apps: StateFlow<List<AppEntry>?> = _apps.asStateFlow()
+
+    fun openApps() {
+        _appsOpen.value = true
+        if (_apps.value == null) loadApps()
+    }
+
+    fun closeApps() {
+        _appsOpen.value = false
+    }
+
+    fun loadApps() {
+        viewModelScope.launch {
+            val list = withContext(Dispatchers.IO) { runCatching { readApps() }.getOrDefault(emptyList()) }
+            _apps.value = list
+        }
+    }
+
+    private fun readApps(): List<AppEntry> {
+        val pm = getApplication<Application>().packageManager
+        return pm.getInstalledPackages(0).mapNotNull { pi ->
+            val ai = pi.applicationInfo ?: return@mapNotNull null
+            AppEntry(pi.packageName, ai.loadLabel(pm).toString(), pi.versionName ?: "", !isUserApp(ai), File(ai.sourceDir).length(), ai.sourceDir)
+        }.sortedBy { it.label.lowercase() }
+    }
+
+    fun appSettings(pkg: String) {
+        eventChannel.trySend(UiEvent.Launch(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg"))))
+    }
+
+    fun launchApp(pkg: String) {
+        val intent = getApplication<Application>().packageManager.getLaunchIntentForPackage(pkg)
+        if (intent != null) eventChannel.trySend(UiEvent.Launch(intent)) else toast("این برنامه صفحه‌ی اجرا ندارد")
+    }
+
+    fun uninstallApp(pkg: String) {
+        eventChannel.trySend(UiEvent.Launch(Intent(Intent.ACTION_DELETE, Uri.parse("package:$pkg"))))
+    }
+
+    /** Copies the app's APK into Download/Filyar-APK. */
+    fun backupApk(e: AppEntry) = runOp("در حال ذخیره‌ی APK") { b, _ ->
+        val dir = "$rootPath/Download/Filyar-APK"
+        b.mkdirs(dir)
+        val safe = e.label.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+        val name = FileOps.uniqueName(b, dir, "$safe-${e.versionName.ifEmpty { "x" }}.apk")
+        val dest = joinPath(dir, name)
+        File(e.sourceDir).inputStream().use { input -> b.openOutput(dest).use { out -> input.copyTo(out) } }
+        "ذخیره شد: $name (${formatSize(File(e.sourceDir).length())})"
     }
 
     fun scanDuplicates() {
@@ -1121,6 +1448,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
         const val APK_MIN = 50L * 1024
         const val MEDIA_MIN = 20L * 1024
         const val RECENT_COUNT = 200
+        const val LIST_LIMIT = 3000
         const val BACKUP_DIR = "Filyar-Backup"
         val PACKAGE_NAME = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")
         val ALL_MEDIA_EXTENSIONS: Set<String> = MediaKind.values().flatMap { it.extensions }.toSet()

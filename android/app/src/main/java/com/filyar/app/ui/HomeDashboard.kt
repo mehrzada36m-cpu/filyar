@@ -111,9 +111,11 @@ fun HomeDashboard(
     onOpenMedia: (MediaKind) -> Unit = {},
     onOpenBackups: () -> Unit = {},
     listState: LazyListState = rememberLazyListState(),
+    stats: MediaStats = MediaStats(),
+    onOpenApps: () -> Unit = {},
 ) {
     if (style == HomeStyle.Classic) {
-        ClassicHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onGrantLocal, onRemoveQuick, onAddQuick, onCustomizeQuick, onOpenCleaner, onOpenMedia, onOpenBackups, listState)
+        ClassicHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onGrantLocal, onRemoveQuick, onAddQuick, onCustomizeQuick, onOpenCleaner, onOpenMedia, onOpenBackups, listState, stats, onOpenApps)
     } else {
         CardsHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onShizukuAction, onShowGuide, onGrantLocal, onRemoveQuick, onAddQuick, onCustomizeQuick, onOpenCleaner, onOpenBackups, listState)
     }
@@ -578,7 +580,7 @@ private fun ClassicTile(
                     subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
+                    maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -602,6 +604,8 @@ private fun ClassicHome(
     onOpenMedia: (MediaKind) -> Unit,
     onOpenBackups: () -> Unit,
     listState: LazyListState,
+    stats: MediaStats,
+    onOpenApps: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
     val total = storage?.getOrNull(0) ?: 0L
@@ -673,16 +677,34 @@ private fun ClassicHome(
         item(key = "mediaTitle") { ClassicSection("رسانه") }
         item(key = "media1") {
             Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
-                ClassicTile(Icons.Filled.Image, blue, "تصاویر", "پوشه‌های دارای عکس", Modifier.weight(1f)) { onOpenMedia(MediaKind.Images) }
-                ClassicTile(Icons.Filled.Movie, red, "ویدیوها", "پوشه‌های دارای ویدیو", Modifier.weight(1f)) { onOpenMedia(MediaKind.Videos) }
+                ClassicTile(
+                    Icons.Filled.Image, blue, "تصاویر",
+                    if (stats.loaded) "${faNum(stats.images)} تصویر • ${formatSize(stats.imageBytes)}\n${faNum(stats.cameraImages)} عکس دوربین" else "پوشه‌های دارای عکس",
+                    Modifier.weight(1f),
+                ) { onOpenMedia(MediaKind.Images) }
+                ClassicTile(
+                    Icons.Filled.Movie, red, "ویدیوها",
+                    if (stats.loaded) "${faNum(stats.videos)} ویدیو • ${formatSize(stats.videoBytes)}\n${faNum(stats.cameraVideos)} ویدیوی دوربین" else "پوشه‌های دارای ویدیو",
+                    Modifier.weight(1f),
+                ) { onOpenMedia(MediaKind.Videos) }
             }
         }
         item(key = "media2") {
             Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
-                ClassicTile(Icons.Filled.MusicNote, teal, "موسیقی", "پوشه‌های دارای آهنگ", Modifier.weight(1f)) { onOpenMedia(MediaKind.Audio) }
-                ClassicTile(Icons.Filled.Android, green, "برنامه‌ها", "فایل‌های نصبی در همه‌ی حافظه", Modifier.weight(1f)) {
-                    onOpenCleaner(CleanMode.Apks)
-                }
+                ClassicTile(
+                    Icons.Filled.MusicNote, teal, "موسیقی",
+                    if (stats.loaded) {
+                        "${faNum(stats.artists)} هنرمند • ${faNum(stats.albums)} آلبوم • ${formatSize(stats.audioBytes)}\n${faNum(stats.tracks)} آهنگ"
+                    } else {
+                        "پوشه‌های دارای آهنگ"
+                    },
+                    Modifier.weight(1f),
+                ) { onOpenMedia(MediaKind.Audio) }
+                ClassicTile(
+                    Icons.Filled.Android, green, "برنامه‌ها",
+                    if (stats.loaded) "${faNum(stats.userApps)} برنامه‌ی نصب‌شده • ${faNum(stats.systemApps)} سیستمی" else "مدیریت برنامه‌ها و فایل‌های نصبی",
+                    Modifier.weight(1f),
+                ) { onOpenApps() }
             }
         }
 
