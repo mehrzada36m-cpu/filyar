@@ -79,6 +79,7 @@ data class OpProgress(val title: String, val current: String = "", val fraction:
 sealed interface UiEvent {
     data class Edit(val file: RemoteFile) : UiEvent
     data class ViewImage(val file: RemoteFile) : UiEvent
+    data class Play(val file: RemoteFile) : UiEvent
 
     /** An intent for another app; it is started from the Activity so it opens on top of this app. */
     data class Launch(val intent: Intent) : UiEvent
@@ -1311,8 +1312,51 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
         when {
             isEditable(f) -> eventChannel.trySend(UiEvent.Edit(f))
             kindOf(f) == FileKind.Image && f.extension != "svg" -> eventChannel.trySend(UiEvent.ViewImage(f))
+            (kindOf(f) == FileKind.Video || kindOf(f) == FileKind.Audio) && f.extension != "ts" ->
+                if (File(f.path).canRead() && !isRestricted(f.path)) eventChannel.trySend(UiEvent.Play(f)) else openExternal(f, chooser = false)
+            f.extension == "apk" -> _apkPrompt.value = f
+            f.extension == "zip" -> _zipPrompt.value = f
             else -> openExternal(f, chooser = false)
         }
+    }
+
+    // ---------- built-in installer and ZIP preview ----------
+    private val _apkPrompt = MutableStateFlow<RemoteFile?>(null)
+    val apkPrompt: StateFlow<RemoteFile?> = _apkPrompt.asStateFlow()
+    private val _zipPrompt = MutableStateFlow<RemoteFile?>(null)
+    val zipPrompt: StateFlow<RemoteFile?> = _zipPrompt.asStateFlow()
+
+    fun dismissApkPrompt() { _apkPrompt.value = null }
+    fun dismissZipPrompt() { _zipPrompt.value = null }
+
+    /** Starts the system installer; asks for the "install unknown apps" switch first when it is off. */
+    fun installApk(f: RemoteFile) {
+        val app = getApplication<Application>()
+        if (Build.VERSION.SDK_INT >= 26 && !app.packageManager.canRequestPackageInstalls()) {
+            toast("اجازه‌ی نصب برنامه را روشن کنید، بعد دوباره نصب را بزنید")
+            eventChannel.trySend(UiEvent.Launch(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${app.packageName}"))))
+            return
+        }
+        openExternal(f, chooser = false)
+    }
+
+    suspend fun zipEntries(f: RemoteFile): List<Pair<String, Long>> = withContext(Dispatchers.IO) {
+        runCatching {
+            val local = File(f.path)
+            if (local.canRead() && !isRestricted(f.path)) {
+                java.util.zip.ZipFile(local).use { z -> z.entries().asSequence().map { it.name to it.size }.toList() }
+            } else {
+                val out = ArrayList<Pair<String, Long>>()
+                java.util.zip.ZipInputStream(backend.openInput(f.path).buffered()).use { zis ->
+                    while (true) {
+                        val e = zis.nextEntry ?: break
+                        out.add(e.name to e.size)
+                        zis.closeEntry()
+                    }
+                }
+                out
+            }
+        }.getOrDefault(emptyList())
     }
 
     fun openAsText(f: RemoteFile) {

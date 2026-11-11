@@ -79,8 +79,11 @@ private fun isUserMedia(dir: String, root: String): Boolean {
 @Composable
 fun MediaFoldersScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
     val m by vm.media.collectAsStateWithLifecycle()
-    val kind = m.kind ?: return
-    BackHandler { vm.closeMedia() }
+    // Keep the last kind while the screen fades out, so it does not go blank before home appears.
+    val lastKind = remember { arrayOfNulls<MediaKind>(1) }
+    m.kind?.let { lastKind[0] = it }
+    val kind = m.kind ?: lastKind[0] ?: return
+    BackHandler(enabled = m.kind != null) { vm.closeMedia() }
     val root = vm.rootPath
     val stats by vm.stats.collectAsStateWithLifecycle()
     val storage by vm.storage.collectAsStateWithLifecycle()
