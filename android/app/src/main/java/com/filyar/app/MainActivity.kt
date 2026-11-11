@@ -1,5 +1,6 @@
 package com.filyar.app
 
+import com.filyar.app.ui.MediaFoldersScreen
 import android.content.ActivityNotFoundException
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -49,6 +50,7 @@ private sealed interface Screen {
     data class Viewer(val file: RemoteFile) : Screen
     data object Settings : Screen
     data object Clean : Screen
+    data object Media : Screen
 }
 
 class MainActivity : ComponentActivity() {
@@ -93,7 +95,12 @@ class MainActivity : ComponentActivity() {
 private fun AppRoot(vm: BrowserViewModel) {
     var base by remember { mutableStateOf<Screen>(Screen.Browser) }
     val clean by vm.clean.collectAsStateWithLifecycle()
-    val screen: Screen = if (base == Screen.Browser && clean.mode != null) Screen.Clean else base
+    val media by vm.media.collectAsStateWithLifecycle()
+    val screen: Screen = when {
+        base == Screen.Browser && media.kind != null -> Screen.Media
+        base == Screen.Browser && clean.mode != null -> Screen.Clean
+        else -> base
+    }
     val snackbar = remember { SnackbarHostState() }
     val progress by vm.progress.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -126,6 +133,7 @@ private fun AppRoot(vm: BrowserViewModel) {
         when (s) {
             Screen.Browser -> BrowserScreen(vm, snackbar) { base = Screen.Settings }
             Screen.Clean -> CleanScreen(vm, snackbar)
+            Screen.Media -> MediaFoldersScreen(vm, snackbar)
             Screen.Settings -> SettingsScreen(vm, snackbar) { base = Screen.Browser }
             is Screen.Editor -> EditorScreen(s.file, vm, snackbar) { base = Screen.Browser }
             is Screen.Viewer -> ImageViewerScreen(s.file, vm) { base = Screen.Browser }

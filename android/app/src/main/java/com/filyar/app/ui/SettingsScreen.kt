@@ -1,5 +1,6 @@
 package com.filyar.app.ui
 
+import androidx.compose.ui.graphics.lerp
 import kotlin.math.roundToInt
 import com.filyar.app.core.faNum
 import androidx.compose.runtime.setValue
@@ -122,6 +123,11 @@ fun SettingsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onBack: ()
                 options = listOf(false to "فهرستی", true to "شبکه‌ای"),
                 selected = vp.grid,
             ) { g -> vm.updateView { it.copy(grid = g) } }
+            SwitchRow("کارت پشت آیتم‌ها", "قاب گرد پشت هر فایل و پوشه در نمای شبکه‌ای", vp.gridCards) { v ->
+                vm.updateView { it.copy(gridCards = v) }
+            }
+            Label("رنگ پس‌زمینه‌ی کارت")
+            CardColorPicker(selected = vp.cardColor, enabled = vp.gridCards) { c -> vm.updateView { it.copy(cardColor = c) } }
             SwitchRow("پیش‌نمایش تصویر و ویدیو", "نمایش بندانگشتی فایل‌های رسانه‌ای", vp.previews) { v ->
                 vm.updateView { it.copy(previews = v) }
             }
@@ -298,5 +304,34 @@ private fun ScaleSlider(title: String, value: Float, onCommit: (Float) -> Unit) 
             valueRange = 0.7f..1.6f,
             steps = 8,
         )
+    }
+}
+
+@Composable
+private fun CardColorPicker(selected: Int, enabled: Boolean, onSelect: (Int) -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val options = listOf(-1) + AccentColors.indices.toList()
+    Row(
+        Modifier
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        options.forEach { i ->
+            // The swatch is a little stronger than the real card tint so the choices are easy to tell apart.
+            val swatch = if (i < 0) scheme.surfaceContainerHigh else lerp(scheme.surface, AccentColors[i], 0.35f)
+            val sel = i == selected
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(swatch.copy(alpha = if (enabled) 1f else 0.4f))
+                    .border(if (sel) 3.dp else 1.dp, if (sel) scheme.primary else scheme.outlineVariant, CircleShape)
+                    .clickable(enabled = enabled) { onSelect(i) },
+                contentAlignment = Alignment.Center,
+            ) {
+                if (sel) Icon(Icons.Filled.Check, null, tint = scheme.primary)
+            }
+        }
     }
 }

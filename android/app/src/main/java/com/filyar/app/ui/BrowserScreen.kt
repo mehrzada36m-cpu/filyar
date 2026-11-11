@@ -306,6 +306,7 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
                     onCustomizeQuick = { dlg = Dlg.QuickStyle(it) },
                     onOpenCleaner = { vm.openClean(it) },
                     style = vp.homeStyle,
+                    onOpenMedia = { vm.openMedia(it) },
                 )
                 else -> {
                     Breadcrumbs(path, vm.rootPath) { vm.navigate(it) }

@@ -36,6 +36,9 @@ data class ViewPrefs(
     /** Extra scaling on top of [itemSize]: 1f is the preset's own size. */
     val fileScale: Float = 1f,
     val folderScale: Float = 1f,
+    /** The rounded card behind each item in grid view, and its tint (index into the accent palette, -1 = neutral). */
+    val gridCards: Boolean = true,
+    val cardColor: Int = -1,
 )
 
 /** A user-chosen look for one folder: icon key and colour index (-1 = default colour). */
@@ -66,6 +69,8 @@ class Prefs(context: Context) {
             homeStyle = enumPref("homeStyle", HomeStyle.Cards),
             fileScale = sp.getFloat("fileScale", 1f).coerceIn(0.6f, 1.8f),
             folderScale = sp.getFloat("folderScale", 1f).coerceIn(0.6f, 1.8f),
+            gridCards = sp.getBoolean("gridCards", true),
+            cardColor = sp.getInt("cardColor", -1),
         )
     )
     val view: StateFlow<ViewPrefs> = _view.asStateFlow()
@@ -101,6 +106,8 @@ class Prefs(context: Context) {
             .putString("homeStyle", v.homeStyle.name)
             .putFloat("fileScale", v.fileScale)
             .putFloat("folderScale", v.folderScale)
+            .putBoolean("gridCards", v.gridCards)
+            .putInt("cardColor", v.cardColor)
             .apply()
     }
 

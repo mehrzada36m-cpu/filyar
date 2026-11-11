@@ -1,5 +1,7 @@
 package com.filyar.app.ui
 
+import com.filyar.app.ui.theme.AccentColors
+import androidx.compose.ui.graphics.lerp
 import com.filyar.app.core.FolderModel
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.BoxScope
@@ -306,8 +308,14 @@ fun FileGridItem(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
-    val iconSize = LocalViewPrefs.current.itemSize.gridIcon * iconScaleFor(f)
-    val bg = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceContainerLow
+    val prefs = LocalViewPrefs.current
+    val iconSize = prefs.itemSize.gridIcon * iconScaleFor(f)
+    val scheme = MaterialTheme.colorScheme
+    val card = when {
+        !prefs.gridCards -> Color.Transparent
+        else -> AccentColors.getOrNull(prefs.cardColor)?.let { lerp(scheme.surface, it, 0.16f) } ?: scheme.surfaceContainerLow
+    }
+    val bg = if (selected) scheme.primaryContainer.copy(alpha = 0.6f) else card
     Column(
         Modifier
             .padding(4.dp)

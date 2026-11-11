@@ -73,6 +73,24 @@ sealed interface UiEvent {
 
 enum class CleanMode { Large, Duplicates, Apks }
 
+/** The three kinds of media the home screen can list by folder. */
+enum class MediaKind(val title: String, val extensions: Set<String>) {
+    Images("تصاویر", setOf("jpg", "jpeg", "png", "webp", "gif", "bmp", "heic", "heif", "avif")),
+    Videos("ویدیوها", setOf("mp4", "mkv", "webm", "3gp", "avi", "mov", "flv", "m4v", "mpg", "mpeg", "wmv", "ts")),
+    Audio("موسیقی", setOf("mp3", "m4a", "aac", "ogg", "opus", "wav", "flac", "amr", "wma", "mid", "midi")),
+}
+
+/** Every media file found in storage; the screen groups them by folder for the chosen [kind]. */
+data class MediaState(
+    val kind: MediaKind? = null,
+    val scanning: Boolean = false,
+    val files: List<RemoteFile> = emptyList(),
+    val scanned: Boolean = false,
+    val scannedAt: Long = 0L,
+    val error: String? = null,
+    val includeHidden: Boolean = false,
+)
+
 /** State of the "advanced delete" screens. */
 data class CleanState(
     val mode: CleanMode? = null,
@@ -102,6 +120,10 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     val quickAccess: StateFlow<List<String>> = prefs.quickAccess
     val folderStyles: StateFlow<Map<String, FolderStyle>> = prefs.folderStyles
     val folderLayouts: StateFlow<Map<String, Boolean>> = prefs.folderLayouts
+
+    private val _media = MutableStateFlow(MediaState())
+    val media: StateFlow<MediaState> = _media.asStateFlow()
+    private var mediaJob: Job? = null
 
     private val _clean = MutableStateFlow(CleanState())
     val clean: StateFlow<CleanState> = _clean.asStateFlow()
@@ -448,6 +470,44 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun openMedia(kind: MediaKind) {
+        _media.update { it.copy(kind = kind) }
+        val m = _media.value
+        // Reuse the last scan for a couple of minutes so reopening is instant.
+        if (!m.scanning && (!m.scanned || System.currentTimeMillis() - m.scannedAt > 120_000)) scanMedia()
+    }
+
+    fun closeMedia() {
+        _media.update { it.copy(kind = null) }
+    }
+
+    fun setMediaIncludeHidden(v: Boolean) {
+        _media.update { it.copy(includeHidden = v) }
+    }
+
+    /** Leaves the media list and shows [path], so "back" returns home. */
+    fun showMediaFolder(path: String) {
+        closeMedia()
+        openFromHome(path)
+    }
+
+    fun scanMedia() {
+        mediaJob?.cancel()
+        mediaJob = viewModelScope.launch {
+            _media.update { it.copy(scanning = true, error = null) }
+            val b = backend
+            val res = withContext(Dispatchers.IO) {
+                runCatching { b.scan(rootPath, MEDIA_MIN).filter { it.extension in ALL_MEDIA_EXTENSIONS } }
+            }
+            res.onSuccess { list ->
+                _media.update { it.copy(scanning = false, files = list, scanned = true, scannedAt = System.currentTimeMillis()) }
+            }.onFailure { e ->
+                if (e is CancellationException) throw e
+                _media.update { it.copy(scanning = false, error = e.message ?: "جستجو ممکن نشد") }
+            }
+        }
+    }
+
     fun closeClean() {
         cleanJob?.cancel()
         _clean.update { it.copy(mode = null, scanning = false, selection = emptySet()) }
@@ -734,6 +794,8 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
         const val DEFAULT_LARGE_MIN = 50 * MB
         const val DUPLICATE_MIN = 10L * 1024
         const val APK_MIN = 50L * 1024
+        const val MEDIA_MIN = 20L * 1024
+        val ALL_MEDIA_EXTENSIONS: Set<String> = MediaKind.values().flatMap { it.extensions }.toSet()
         val APK_EXTENSIONS = setOf("apk", "apks", "xapk", "apkm")
     }
 }

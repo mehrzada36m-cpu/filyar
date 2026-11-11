@@ -103,9 +103,10 @@ fun HomeDashboard(
     onCustomizeQuick: (String) -> Unit,
     onOpenCleaner: (CleanMode) -> Unit,
     style: HomeStyle = HomeStyle.Cards,
+    onOpenMedia: (MediaKind) -> Unit = {},
 ) {
     if (style == HomeStyle.Classic) {
-        ClassicHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onGrantLocal, onRemoveQuick, onAddQuick, onCustomizeQuick, onOpenCleaner)
+        ClassicHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onGrantLocal, onRemoveQuick, onAddQuick, onCustomizeQuick, onOpenCleaner, onOpenMedia)
     } else {
         CardsHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onShizukuAction, onShowGuide, onGrantLocal, onRemoveQuick, onAddQuick, onCustomizeQuick, onOpenCleaner)
     }
@@ -583,6 +584,7 @@ private fun ClassicHome(
     onAddQuick: () -> Unit,
     onCustomizeQuick: (String) -> Unit,
     onOpenCleaner: (CleanMode) -> Unit,
+    onOpenMedia: (MediaKind) -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
     val total = storage?.getOrNull(0) ?: 0L
@@ -653,13 +655,13 @@ private fun ClassicHome(
         item(key = "mediaTitle") { ClassicSection("رسانه") }
         item(key = "media1") {
             Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
-                ClassicTile(Icons.Filled.Image, blue, "تصاویر", "Pictures", Modifier.weight(1f)) { onOpen("$rootPath/Pictures") }
-                ClassicTile(Icons.Filled.Movie, red, "ویدیوها", "Movies", Modifier.weight(1f)) { onOpen("$rootPath/Movies") }
+                ClassicTile(Icons.Filled.Image, blue, "تصاویر", "پوشه‌های دارای عکس", Modifier.weight(1f)) { onOpenMedia(MediaKind.Images) }
+                ClassicTile(Icons.Filled.Movie, red, "ویدیوها", "پوشه‌های دارای ویدیو", Modifier.weight(1f)) { onOpenMedia(MediaKind.Videos) }
             }
         }
         item(key = "media2") {
             Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
-                ClassicTile(Icons.Filled.MusicNote, teal, "موسیقی", "Music", Modifier.weight(1f)) { onOpen("$rootPath/Music") }
+                ClassicTile(Icons.Filled.MusicNote, teal, "موسیقی", "پوشه‌های دارای آهنگ", Modifier.weight(1f)) { onOpenMedia(MediaKind.Audio) }
                 ClassicTile(Icons.Filled.Android, green, "برنامه‌ها", "فایل‌های نصبی در همه‌ی حافظه", Modifier.weight(1f)) {
                     onOpenCleaner(CleanMode.Apks)
                 }
