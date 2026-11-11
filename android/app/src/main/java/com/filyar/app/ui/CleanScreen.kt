@@ -216,6 +216,13 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                     },
                 )
             } else if (mode == CleanMode.Apks) {
+                AppsCapsule(selected = 0) { i ->
+                    if (i != 0) {
+                        vm.setAppsTab(i)
+                        vm.openApps()
+                        vm.closeClean()
+                    }
+                }
                 Text(
                     "فایل‌های apk، apks، xapk و apkm در همه‌ی حافظه. برای دیدن آن‌ها داخل Android/data باید Shizuku روشن باشد.",
                     style = MaterialTheme.typography.bodySmall,

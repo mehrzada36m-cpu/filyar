@@ -1163,6 +1163,10 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     val appsOpen: StateFlow<Boolean> = _appsOpen.asStateFlow()
     private val _apps = MutableStateFlow<List<AppEntry>?>(null)
     val apps: StateFlow<List<AppEntry>?> = _apps.asStateFlow()
+    private val _appsTab = MutableStateFlow(1)
+    /** 1 = installed apps, 2 = system apps (0 is the APK-files screen). */
+    val appsTab: StateFlow<Int> = _appsTab.asStateFlow()
+    fun setAppsTab(tab: Int) { _appsTab.value = tab }
 
     fun openApps() {
         _appsOpen.value = true
