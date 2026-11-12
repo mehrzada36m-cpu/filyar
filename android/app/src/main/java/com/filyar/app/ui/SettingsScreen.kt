@@ -113,6 +113,7 @@ fun SettingsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onBack: ()
             }
             Label("رنگ پس‌زمینه‌ی برنامه")
             BackgroundPicker(selected = vp.bgColor) { c -> vm.updateView { it.copy(bgColor = c) } }
+            ScaleSlider("شدت محو پس‌زمینه‌ی صفحه‌ی اصلی", vp.bgBlur / 100f, range = 0f..1f, steps = 9) { v -> vm.updateView { it.copy(bgBlur = (v * 100).roundToInt()) } }
             val dynamicOn = vp.dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
             Label(if (dynamicOn) "رنگ اصلی (با رنگ پویا خاموش می‌شود)" else "رنگ اصلی")
             AccentPicker(selected = vp.accent, enabled = !dynamicOn) { a -> vm.updateView { it.copy(accent = a) } }

@@ -51,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import com.filyar.app.core.HomeStyle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -152,9 +153,24 @@ fun FolderGlyph(path: String, name: String, size: Dp, modifier: Modifier = Modif
         ?: Icons.Filled.Folder
     val model = custom?.model ?: prefs.folderModel
     val plain = model == FolderModel.Plain
+    val glass = prefs.homeStyle == HomeStyle.Glass
     Box(modifier.size(size)) {
-        FolderFrame(model, tint, size) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size * (if (plain) 0.92f else 0.56f)))
+        if (glass) {
+            val variant = path.hashCode() and 1
+            GlassFolderIcon(size, variant)
+            val hasOwnIcon = customIcon != null || builtin != null || (a == null && appIcons && FolderIcons.appFallbackFor(name) != null)
+            if (hasOwnIcon) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = if (variant == 0) Color.White else Color(0xFF0A4F66),
+                    modifier = Modifier.align(Alignment.Center).offset(y = size * 0.07f).size(size * 0.34f),
+                )
+            }
+        } else {
+            FolderFrame(model, tint, size) {
+                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size * (if (plain) 0.92f else 0.56f)))
+            }
         }
         if (a != null) {
             val badge = RoundedCornerShape(size * 0.12f)

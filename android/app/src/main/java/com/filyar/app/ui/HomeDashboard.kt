@@ -489,7 +489,7 @@ private fun QuickTile(
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             if (glass) {
-                GlassBubble(MaterialTheme.colorScheme.primary) { FolderGlyph(path, name, 36.dp * LocalViewPrefs.current.folderScale) }
+                FolderGlyph(path, name, 52.dp * LocalViewPrefs.current.folderScale)
             } else {
                 FolderGlyph(path, name, 40.dp * LocalViewPrefs.current.folderScale)
             }
@@ -622,9 +622,9 @@ private fun Modifier.glassCard(radius: Dp = 20.dp): Modifier {
     val dark = isDarkSurface()
     val shape = RoundedCornerShape(radius)
     val fill = if (dark) {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.16f), Color.White.copy(alpha = 0.07f)))
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.12f), Color.White.copy(alpha = 0.05f)))
     } else {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.78f), Color.White.copy(alpha = 0.46f)))
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.46f), Color.White.copy(alpha = 0.18f)))
     }
     val rim = if (dark) {
         Brush.linearGradient(listOf(Color.White.copy(alpha = 0.50f), Color.White.copy(alpha = 0.06f)))
@@ -636,7 +636,7 @@ private fun Modifier.glassCard(radius: Dp = 20.dp): Modifier {
         .drawBehind {
             val r = radius.toPx()
             val dy = 3.dp.toPx()
-            listOf(8.dp to 0.025f, 5.dp to 0.035f, 2.5.dp to 0.05f).forEach { (grow, alpha) ->
+            listOf(7.dp to 0.012f, 4.dp to 0.018f, 2.dp to 0.026f).forEach { (grow, alpha) ->
                 val g = grow.toPx()
                 drawRoundRect(
                     color = shadowColor.copy(alpha = alpha),

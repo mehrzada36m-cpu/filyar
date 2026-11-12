@@ -45,6 +45,8 @@ data class ViewPrefs(
     val itemGap: Float = 1f,
     /** Columns in grid view; 0 picks as many as fit. */
     val gridColumns: Int = 0,
+    /** Blur of the home screen backdrop, 0–100 (needs Android 12+). */
+    val bgBlur: Int = 0,
 )
 
 /** A user-chosen look for one folder: icon key and colour index (-1 = default colour). */
@@ -80,6 +82,7 @@ class Prefs(context: Context) {
             bgColor = sp.getInt("bgColor", -1),
             itemGap = sp.getFloat("itemGap", 1f).coerceIn(0f, 2f),
             gridColumns = sp.getInt("gridColumns", 0).coerceIn(0, 8),
+            bgBlur = sp.getInt("bgBlur", 0).coerceIn(0, 100),
         )
     )
     val view: StateFlow<ViewPrefs> = _view.asStateFlow()
@@ -120,6 +123,7 @@ class Prefs(context: Context) {
             .putInt("bgColor", v.bgColor)
             .putFloat("itemGap", v.itemGap)
             .putInt("gridColumns", v.gridColumns)
+            .putInt("bgBlur", v.bgBlur)
             .apply()
     }
 

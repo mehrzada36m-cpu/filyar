@@ -131,6 +131,10 @@ import com.filyar.app.core.ShizukuManager
 import com.filyar.app.core.HomeStyle
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.alpha
 import com.filyar.app.core.ShizukuStatus
 import com.filyar.app.core.SortBy
 import com.filyar.app.core.LongPressAction
@@ -246,24 +250,14 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
         }
     }
 
-    val showBg = homeBg != null && st.path == null && !searching
     val glassHome = vp.homeStyle == HomeStyle.Glass && st.path == null && !searching
-    val darkBg = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val bgModifier = when {
-        showBg && homeBg != null -> Modifier
-            .clipToBounds()
-            .paint(BitmapPainter(homeBg!!), contentScale = ContentScale.Crop)
-            .background(MaterialTheme.colorScheme.background.copy(alpha = if (glassHome) 0.30f else 0.55f))
-        glassHome -> Modifier.background(
-            Brush.verticalGradient(
-                if (darkBg) listOf(Color(0xFF1B1F24), Color(0xFF0E1013)) else listOf(Color(0xFFF8FAFC), Color(0xFFE3E7ED)),
-            ),
-        )
-        else -> Modifier
-    }
+    val showBackdrop = st.path == null && !searching && (homeBg != null || glassHome || vp.bgBlur > 0)
+    // The backdrop fades in and out over a plain background, so entering or leaving a folder never flashes.
+    val backdropAlpha by animateFloatAsState(if (showBackdrop) 1f else 0f, tween(250), label = "backdrop")
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    if (backdropAlpha > 0f) HomeBackdrop(homeBg, vp.bgBlur, glassHome, Modifier.alpha(backdropAlpha))
     Scaffold(
-        modifier = bgModifier,
-        containerColor = if (showBg || glassHome) Color.Transparent else MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
         topBar = {
             when {
                 selecting -> SelectionTopBar(st.selection.size, onClose = vm::clearSelection, onSelectAll = vm::selectAll)
@@ -272,6 +266,7 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
                     title = st.path?.let { if (it == vm.rootPath) "حافظه داخلی" else it.substringAfterLast('/') } ?: "فایل‌یار",
                     subtitle = if (st.path == null) statusText(shizuku) else countText(st.items),
                     atHome = st.path == null,
+                    frosted = glassHome,
                     shizukuReady = shizuku == ShizukuStatus.Ready,
                     grid = gridHere,
                     layoutOverridden = layoutOverridden,
@@ -380,6 +375,7 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
                 }
             }
         }
+    }
     }
 
     // ---------- dialogs & sheets ----------
@@ -551,6 +547,7 @@ private fun MainTopBar(
     title: String,
     subtitle: String,
     atHome: Boolean,
+    frosted: Boolean = false,
     shizukuReady: Boolean,
     grid: Boolean,
     layoutOverridden: Boolean,
@@ -573,8 +570,13 @@ private fun MainTopBar(
     onShizuku: () -> Unit,
 ) {
     var moreOpen by remember { mutableStateOf(false) }
+    // Always see-through (a frosted tint in the glass style), so it never changes shade when moving between screens.
+    val barColor by animateColorAsState(
+        if (atHome && frosted) MaterialTheme.colorScheme.surface.copy(alpha = 0.28f) else Color.Transparent,
+        label = "bar",
+    )
     TopAppBar(
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = if (atHome) Color.Transparent else MaterialTheme.colorScheme.background),
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = barColor, scrolledContainerColor = barColor),
         navigationIcon = {
             if (!atHome) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت") }
