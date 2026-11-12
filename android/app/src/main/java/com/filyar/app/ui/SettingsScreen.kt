@@ -28,6 +28,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -66,6 +68,10 @@ import com.filyar.app.core.ThemeMode
 @Composable
 fun SettingsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onBack: () -> Unit) {
     val vp by vm.viewPrefs.collectAsStateWithLifecycle()
+    val homeBg by vm.homeBg.collectAsStateWithLifecycle()
+    val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) vm.setHomeBackground(uri)
+    }
     BackHandler(onBack = onBack)
 
     Scaffold(
@@ -94,9 +100,17 @@ fun SettingsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onBack: ()
             ) { m -> vm.updateView { it.copy(theme = m) } }
             Label("چیدمان صفحه‌ی اصلی")
             Chips(
-                options = listOf(HomeStyle.Cards to "کارتی", HomeStyle.Classic to "کلاسیک", HomeStyle.Glass to "شیشه‌ای"),
+                options = listOf(HomeStyle.Cards to "کارتی (فعلی)", HomeStyle.Classic to "کلاسیک", HomeStyle.Glass to "شیشه‌ای"),
                 selected = vp.homeStyle,
             ) { h -> vm.updateView { it.copy(homeStyle = h) } }
+            Label("تصویر زمینه‌ی صفحه‌ی اصلی")
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(onClick = { pickImage.launch("image/*") }) { Text("انتخاب از گالری") }
+                if (homeBg != null) OutlinedButton(onClick = vm::removeHomeBackground) { Text("حذف تصویر") }
+            }
             Label("رنگ پس‌زمینه‌ی برنامه")
             BackgroundPicker(selected = vp.bgColor) { c -> vm.updateView { it.copy(bgColor = c) } }
             val dynamicOn = vp.dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S

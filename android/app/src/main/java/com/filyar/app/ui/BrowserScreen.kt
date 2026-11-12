@@ -113,6 +113,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.paint
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -124,6 +128,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.filyar.app.RemoteFile
 import com.filyar.app.core.ShizukuManager
+import com.filyar.app.core.HomeStyle
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.luminance
 import com.filyar.app.core.ShizukuStatus
 import com.filyar.app.core.SortBy
 import com.filyar.app.core.LongPressAction
@@ -174,6 +181,7 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
     val folderStyles by vm.folderStyles.collectAsStateWithLifecycle()
     val folderLayouts by vm.folderLayouts.collectAsStateWithLifecycle()
     val stats by vm.stats.collectAsStateWithLifecycle()
+    val homeBg by vm.homeBg.collectAsStateWithLifecycle()
     LaunchedEffect(st.path == null) { if (st.path == null) vm.refreshStats() }
     val curPath = st.path
     val gridHere = curPath?.let { folderLayouts[it] } ?: vp.grid
@@ -184,6 +192,18 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
     var dlg by remember { mutableStateOf<Dlg?>(null) }
 
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { vm.onResume() }
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= 33) {
+            val media = arrayOf(
+                Manifest.permission.READ_MEDIA_AUDIO,
+                Manifest.permission.READ_MEDIA_IMAGES,
+                Manifest.permission.READ_MEDIA_VIDEO,
+            )
+            if (media.any { context.checkSelfPermission(it) != android.content.pm.PackageManager.PERMISSION_GRANTED }) {
+                permLauncher.launch(media)
+            }
+        }
+    }
     val grantLocal: () -> Unit = {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
@@ -226,8 +246,24 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
         }
     }
 
+    val showBg = homeBg != null && st.path == null && !searching
+    val glassHome = vp.homeStyle == HomeStyle.Glass && st.path == null && !searching
+    val darkBg = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val bgModifier = when {
+        showBg && homeBg != null -> Modifier
+            .clipToBounds()
+            .paint(BitmapPainter(homeBg!!), contentScale = ContentScale.Crop)
+            .background(MaterialTheme.colorScheme.background.copy(alpha = if (glassHome) 0.30f else 0.55f))
+        glassHome -> Modifier.background(
+            Brush.verticalGradient(
+                if (darkBg) listOf(Color(0xFF1B1F24), Color(0xFF0E1013)) else listOf(Color(0xFFF8FAFC), Color(0xFFE3E7ED)),
+            ),
+        )
+        else -> Modifier
+    }
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        modifier = bgModifier,
+        containerColor = if (showBg || glassHome) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
             when {
                 selecting -> SelectionTopBar(st.selection.size, onClose = vm::clearSelection, onSelectAll = vm::selectAll)
@@ -538,7 +574,7 @@ private fun MainTopBar(
 ) {
     var moreOpen by remember { mutableStateOf(false) }
     TopAppBar(
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = if (atHome) Color.Transparent else MaterialTheme.colorScheme.background),
         navigationIcon = {
             if (!atHome) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت") }
