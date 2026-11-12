@@ -134,6 +134,7 @@ fun SettingsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onBack: ()
             ) { sz -> vm.updateView { it.copy(itemSize = sz) } }
             ScaleSlider("اندازه‌ی آیکون فایل‌ها", vp.fileScale) { v -> vm.updateView { it.copy(fileScale = v) } }
             ScaleSlider("اندازه‌ی آیکون پوشه‌ها", vp.folderScale) { v -> vm.updateView { it.copy(folderScale = v) } }
+            ScaleSlider("اندازه‌ی پوشه‌های دسترسی سریع", vp.quickScale) { v -> vm.updateView { it.copy(quickScale = v) } }
             ScaleSlider("فاصله‌ی بین آیتم‌ها", vp.itemGap, range = 0f..1.6f, steps = 7) { v -> vm.updateView { it.copy(itemGap = v) } }
             Label("تعداد ستون‌ها در نمای شبکه‌ای")
             Chips(

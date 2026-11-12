@@ -109,6 +109,7 @@ data class MediaStats(
     val audioBytes: Long = 0L,
     val artists: Int = 0,
     val albums: Int = 0,
+    val audioFolders: Int = 0,
     val alarms: Int = 0,
     val ringtones: Int = 0,
     val notifications: Int = 0,
@@ -991,6 +992,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
         }
         val artists = HashSet<Long>()
         val albums = HashSet<Long>()
+        val musicFolders = HashSet<String>()
         var tracks = 0
         var audioBytes = 0L
         var alarms = 0
@@ -1021,6 +1023,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
                         audioBytes += c.getLong(iSize)
                         artists.add(c.getLong(iArtist))
                         albums.add(c.getLong(iAlbum))
+                        musicFolders.add(path.substringBeforeLast('/'))
                     }
                     if (c.getInt(iAlarm) != 0) alarms++
                     if (c.getInt(iRing) != 0) ringtones++
@@ -1030,7 +1033,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         s = s.copy(
-            tracks = tracks, audioBytes = audioBytes, artists = artists.size, albums = albums.size,
+            tracks = tracks, audioBytes = audioBytes, artists = artists.size, albums = albums.size, audioFolders = musicFolders.size,
             alarms = alarms, ringtones = ringtones, notifications = notifications, podcasts = podcasts,
         )
         val installed = runCatching { app.packageManager.getInstalledApplications(0) }.getOrDefault(emptyList())

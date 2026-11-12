@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -490,9 +491,9 @@ private fun QuickTile(
     ) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (glass) {
-                FolderGlyph(path, name, 46.dp * LocalViewPrefs.current.folderScale)
+                FolderGlyph(path, name, 46.dp * LocalViewPrefs.current.quickScale)
             } else {
-                FolderGlyph(path, name, 40.dp * LocalViewPrefs.current.folderScale)
+                FolderGlyph(path, name, 40.dp * LocalViewPrefs.current.quickScale)
             }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
@@ -598,6 +599,45 @@ private fun InfoCard(icon: ImageVector, title: String, body: String, action: Str
 
 // ---------- classic home: sectioned list ----------
 
+/** Key of the "recent files" tile that sits at the end of the quick access grid. */
+private const val QUICK_RECENT = "\u0000recent"
+
+/** The recent-files shortcut, drawn like a quick access tile. */
+@Composable
+private fun QuickRecentTile(modifier: Modifier, onClick: () -> Unit) {
+    val glass = LocalGlass.current
+    val tileShape = RoundedCornerShape(22.dp)
+    val scale = LocalViewPrefs.current.quickScale
+    val blue = Color(0xFF2F7DE1)
+    Box(
+        modifier
+            .then(if (glass) Modifier.padding(5.dp).glassCard(22.dp) else Modifier.clip(tileShape))
+            .clickable(onClick = onClick),
+    ) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (glass) {
+                GlassBubble(blue, 46.dp * scale) { Icon(Icons.Filled.History, null, tint = blue) }
+            } else {
+                Box(
+                    Modifier.size(40.dp * scale).clip(CircleShape).background(blue.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Filled.History, null, tint = blue) }
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text("فایل‌های اخیر", style = MaterialTheme.typography.titleSmall.copy(fontSize = 13.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    "تازه‌ترین فایل‌ها",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun ClassicSection(title: String, trailing: (@Composable () -> Unit)? = null) {
     Row(
@@ -692,6 +732,7 @@ private fun ClassicTile(
     modifier: Modifier = Modifier,
     small: Boolean = false,
     vPad: Dp = 10.dp,
+    iconSize: Dp? = null,
     onClick: () -> Unit,
 ) {
     val glass = LocalGlass.current
@@ -703,11 +744,11 @@ private fun ClassicTile(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (glass) {
-            GlassBubble(tint, if (vPad < 10.dp) 46.dp else 52.dp) { Icon(icon, null, tint = tint) }
+            GlassBubble(tint, iconSize ?: 52.dp) { Icon(icon, null, tint = tint) }
         } else {
             Box(
                 Modifier
-                    .size(48.dp)
+                    .size(iconSize ?: 48.dp)
                     .clip(CircleShape)
                     .background(tint.copy(alpha = 0.16f)),
                 contentAlignment = Alignment.Center,
@@ -721,7 +762,7 @@ private fun ClassicTile(
                     subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 3,
+                    maxLines = if (small) 2 else 3,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -786,7 +827,7 @@ private fun ClassicHome(
                 IconButton(onClick = onAddQuick, modifier = Modifier.size(32.dp)) { Icon(Icons.Filled.Add, "افزودن پوشه") }
             }
         }
-        items(quickAccess.chunked(2), key = { row -> "q" + row.joinToString("|") }) { row ->
+        items((quickAccess + QUICK_RECENT).chunked(2), key = { row -> "q" + row.joinToString("|") }) { row ->
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -794,15 +835,19 @@ private fun ClassicHome(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 row.forEach { path ->
-                    QuickTile(
-                        path = path,
-                        rootPath = rootPath,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onOpen(path) },
-                        onCustomize = { onCustomizeQuick(path) },
-                        onRemove = { onRemoveQuick(path) },
-                        card = false,
-                    )
+                    if (path == QUICK_RECENT) {
+                        QuickRecentTile(Modifier.weight(1f)) { onOpenCleaner(CleanMode.Recent) }
+                    } else {
+                        QuickTile(
+                            path = path,
+                            rootPath = rootPath,
+                            modifier = Modifier.weight(1f),
+                            onClick = { onOpen(path) },
+                            onCustomize = { onCustomizeQuick(path) },
+                            onRemove = { onRemoveQuick(path) },
+                            card = false,
+                        )
+                    }
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
@@ -814,12 +859,12 @@ private fun ClassicHome(
                 ClassicTile(
                     Icons.Filled.Image, blue, "تصاویر",
                     if (stats.loaded) "${faNum(stats.images)} تصویر\n${faNum(stats.cameraImages)} عکس دوربین" else "پوشه‌های دارای عکس",
-                    Modifier.weight(1f), small = true, vPad = 6.dp,
+                    Modifier.weight(1f).heightIn(min = 76.dp), small = true, vPad = 6.dp, iconSize = 44.dp,
                 ) { onOpenMedia(MediaKind.Images) }
                 ClassicTile(
                     Icons.Filled.Movie, red, "ویدیوها",
                     if (stats.loaded) "${faNum(stats.videos)} ویدیو\n${faNum(stats.cameraVideos)} ویدیوی دوربین" else "پوشه‌های دارای ویدیو",
-                    Modifier.weight(1f), small = true, vPad = 6.dp,
+                    Modifier.weight(1f).heightIn(min = 76.dp), small = true, vPad = 6.dp, iconSize = 44.dp,
                 ) { onOpenMedia(MediaKind.Videos) }
             }
         }
@@ -828,16 +873,16 @@ private fun ClassicHome(
                 ClassicTile(
                     Icons.Filled.MusicNote, teal, "موسیقی",
                     if (stats.loaded) {
-                        "${faNum(stats.artists)} هنرمند • ${faNum(stats.albums)} آلبوم\n${faNum(stats.tracks)} آهنگ"
+                        "${faNum(stats.tracks)} آهنگ • ${faNum(stats.audioFolders)} پوشه"
                     } else {
                         "پوشه‌های دارای آهنگ"
                     },
-                    Modifier.weight(1f), small = true, vPad = 6.dp,
+                    Modifier.weight(1f).heightIn(min = 76.dp), small = true, vPad = 6.dp, iconSize = 44.dp,
                 ) { onOpenMedia(MediaKind.Audio) }
                 ClassicTile(
                     Icons.Filled.Android, green, "برنامه‌ها",
-                    if (stats.loaded) "${faNum(stats.userApps)} برنامه‌ی نصب‌شده • ${faNum(stats.systemApps)} سیستمی" else "مدیریت برنامه‌ها و فایل‌های نصبی",
-                    Modifier.weight(1f), small = true, vPad = 6.dp,
+                    if (stats.loaded) "${faNum(stats.userApps + stats.systemApps)} برنامه" else "مدیریت برنامه‌ها و فایل‌های نصبی",
+                    Modifier.weight(1f).heightIn(min = 76.dp), small = true, vPad = 6.dp, iconSize = 44.dp,
                 ) { onOpenApps() }
             }
         }
@@ -845,28 +890,20 @@ private fun ClassicHome(
         item(key = "toolsTitle") { ClassicSection("ابزارها") }
         item(key = "tools") {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
-                ClassicTile(Icons.Filled.SdStorage, purple, "فایل‌های بزرگ", "پاکسازی فایل‌های حجیم", Modifier.weight(1f), small = true) {
+                ClassicTile(Icons.Filled.SdStorage, purple, "فایل‌های بزرگ", "پاکسازی فایل‌های حجیم", Modifier.weight(1f), small = true, iconSize = 44.dp) {
                     onOpenCleaner(CleanMode.Large)
                 }
-                ClassicTile(Icons.Filled.FileCopy, purple, "فایل‌های تکراری", "حذف کپی‌های اضافه", Modifier.weight(1f), small = true) {
+                ClassicTile(Icons.Filled.FileCopy, purple, "فایل‌های تکراری", "حذف کپی‌های اضافه", Modifier.weight(1f), small = true, iconSize = 44.dp) {
                     onOpenCleaner(CleanMode.Duplicates)
                 }
             }
         }
         item(key = "tools2") {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
-                ClassicTile(Icons.Filled.FolderOff, red, "پوشه‌های باقی‌مانده", "دیتای برنامه‌های حذف‌شده", Modifier.weight(1f), small = true) {
+                ClassicTile(Icons.Filled.FolderOff, red, "پوشه‌های باقی‌مانده", "دیتای برنامه‌های حذف‌شده", Modifier.weight(1f), small = true, iconSize = 44.dp) {
                     onOpenCleaner(CleanMode.Leftovers)
                 }
-                ClassicTile(Icons.Filled.History, blue, "فایل‌های اخیر", "تازه‌ترین فایل‌ها", Modifier.weight(1f), small = true) {
-                    onOpenCleaner(CleanMode.Recent)
-                }
-            }
-        }
-        item(key = "tools3") {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
-                ClassicTile(Icons.Filled.Backup, amber, "پشتیبان‌ها", "پشتیبان دیتای برنامه‌ها", Modifier.weight(1f), small = true) { onOpenBackups() }
-                Spacer(Modifier.weight(1f))
+                ClassicTile(Icons.Filled.Backup, amber, "پشتیبان‌ها", "پشتیبان دیتای برنامه‌ها", Modifier.weight(1f), small = true, iconSize = 44.dp) { onOpenBackups() }
             }
         }
     }
