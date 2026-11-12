@@ -3,6 +3,9 @@ package com.filyar.app.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.Surface
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -69,14 +72,13 @@ import kotlinx.coroutines.withContext
 fun AppsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
     val apps by vm.apps.collectAsStateWithLifecycle()
     BackHandler { vm.closeApps() }
-    var tab by rememberSaveable { mutableIntStateOf(0) }
+    val tab by vm.appsTab.collectAsStateWithLifecycle()
     val all = apps.orEmpty()
     val userCount = all.count { !it.isSystem }
     val list = remember(apps, tab) {
         when (tab) {
-            0 -> all.filter { !it.isSystem }
-            1 -> all.filter { it.isSystem }
-            else -> all
+            2 -> all.filter { it.isSystem }
+            else -> all.filter { !it.isSystem }
         }
     }
 
@@ -98,7 +100,6 @@ fun AppsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                     }
                 },
                 actions = {
-                    IconButton(onClick = { vm.openClean(CleanMode.Apks) }) { Icon(Icons.Filled.Android, "فایل‌های نصبی (APK)") }
                     IconButton(onClick = vm::loadApps) { Icon(Icons.Filled.Refresh, "تازه‌سازی") }
                 },
             )
@@ -106,11 +107,7 @@ fun AppsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             if (apps == null) LinearProgressIndicator(Modifier.fillMaxWidth())
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = tab == 0, onClick = { tab = 0 }, label = { Text("نصب‌شده‌ها (${faNum(userCount)})") })
-                FilterChip(selected = tab == 1, onClick = { tab = 1 }, label = { Text("سیستمی (${faNum(all.size - userCount)})") })
-                FilterChip(selected = tab == 2, onClick = { tab = 2 }, label = { Text("همه (${faNum(all.size)})") })
-            }
+            AppsCapsule(selected = tab) { i -> if (i == 0) vm.openClean(CleanMode.Apks) else vm.setAppsTab(i) }
             LazyColumn(contentPadding = PaddingValues(bottom = 32.dp)) {
                 items(list, key = { it.pkg }) { e -> AppRow(e, vm) }
             }
@@ -184,6 +181,41 @@ private fun AppRow(e: AppEntry, vm: BrowserViewModel) {
                                 menu = false
                                 vm.uninstallApp(e.pkg)
                             },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Floating capsule shared by the apps screens: 0 = APK files, 1 = installed, 2 = system. */
+@Composable
+fun AppsCapsule(selected: Int, onSelect: (Int) -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val labels = listOf("فایل برنامه‌ها", "نصب‌شده‌ها", "سیستمی")
+    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = scheme.surfaceContainerHigh,
+            tonalElevation = 6.dp,
+            shadowElevation = 6.dp,
+        ) {
+            Row(Modifier.padding(4.dp)) {
+                labels.forEachIndexed { i, label ->
+                    val on = i == selected
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(if (on) scheme.primary else Color.Transparent)
+                            .clickable { onSelect(i) }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (on) scheme.onPrimary else scheme.onSurfaceVariant,
+                            maxLines = 1,
                         )
                     }
                 }
