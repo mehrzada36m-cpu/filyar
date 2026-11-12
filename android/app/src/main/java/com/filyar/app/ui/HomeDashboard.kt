@@ -41,7 +41,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.border
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
@@ -480,7 +483,7 @@ private fun QuickTile(
     val tileShape = RoundedCornerShape(22.dp)
     Box(
         modifier
-            .then(if (glass) Modifier.padding(5.dp).glassCard(tileShape) else Modifier.clip(tileShape))
+            .then(if (glass) Modifier.padding(5.dp).glassCard(22.dp) else Modifier.clip(tileShape))
             .then(if (card && !glass) Modifier.background(MaterialTheme.colorScheme.surfaceContainerLow) else Modifier)
             .combinedClickable(onClick = onClick, onLongClick = { menu = true }),
     ) {
@@ -613,20 +616,36 @@ private val LocalGlass = compositionLocalOf { false }
 @Composable
 private fun isDarkSurface(): Boolean = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
-/** Frosted, translucent card: soft fill, bright rim light and a gentle shadow. */
+/** Frosted, translucent card: soft fill, bright rim light, darker lower edge and a hand-drawn soft shadow. */
 @Composable
-private fun Modifier.glassCard(shape: Shape = RoundedCornerShape(24.dp)): Modifier {
+private fun Modifier.glassCard(radius: Dp = 20.dp): Modifier {
     val dark = isDarkSurface()
+    val shape = RoundedCornerShape(radius)
     val fill = if (dark) {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.14f), Color.White.copy(alpha = 0.06f)))
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.16f), Color.White.copy(alpha = 0.07f)))
     } else {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.72f), Color.White.copy(alpha = 0.40f)))
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.78f), Color.White.copy(alpha = 0.46f)))
     }
-    val rim = Brush.linearGradient(
-        listOf(Color.White.copy(alpha = if (dark) 0.45f else 0.95f), Color.White.copy(alpha = if (dark) 0.05f else 0.25f)),
-    )
+    val rim = if (dark) {
+        Brush.linearGradient(listOf(Color.White.copy(alpha = 0.50f), Color.White.copy(alpha = 0.06f)))
+    } else {
+        Brush.linearGradient(listOf(Color.White, Color(0xFFB8C0CC).copy(alpha = 0.55f)))
+    }
+    val shadowColor = if (dark) Color.Black else Color(0xFF50607A)
     return this
-        .shadow(6.dp, shape, ambientColor = Color.Black.copy(alpha = 0.05f), spotColor = Color.Black.copy(alpha = 0.10f))
+        .drawBehind {
+            val r = radius.toPx()
+            val dy = 3.dp.toPx()
+            listOf(8.dp to 0.025f, 5.dp to 0.035f, 2.5.dp to 0.05f).forEach { (grow, alpha) ->
+                val g = grow.toPx()
+                drawRoundRect(
+                    color = shadowColor.copy(alpha = alpha),
+                    topLeft = Offset(-g, -g + dy),
+                    size = Size(size.width + 2 * g, size.height + 2 * g),
+                    cornerRadius = CornerRadius(r + g),
+                )
+            }
+        }
         .clip(shape)
         .background(fill)
         .border(1.dp, rim, shape)
@@ -639,16 +658,24 @@ private fun GlassBubble(tint: Color, size: Dp = 52.dp, content: @Composable () -
     Box(
         Modifier
             .size(size)
-            .shadow(6.dp, CircleShape, ambientColor = tint.copy(alpha = 0.18f), spotColor = tint.copy(alpha = 0.25f))
+            .drawBehind {
+                listOf(6.dp to 0.06f, 3.dp to 0.09f).forEach { (grow, alpha) ->
+                    drawCircle(
+                        color = tint.copy(alpha = alpha),
+                        radius = this.size.minDimension / 2 + grow.toPx(),
+                        center = center + Offset(0f, 2.dp.toPx()),
+                    )
+                }
+            }
             .clip(CircleShape)
             .background(
                 Brush.linearGradient(
-                    listOf(Color.White.copy(alpha = if (dark) 0.30f else 0.92f), tint.copy(alpha = if (dark) 0.28f else 0.22f)),
+                    listOf(Color.White.copy(alpha = if (dark) 0.30f else 0.95f), tint.copy(alpha = if (dark) 0.30f else 0.26f)),
                 ),
             )
             .border(
                 1.dp,
-                Brush.linearGradient(listOf(Color.White.copy(alpha = if (dark) 0.5f else 1f), Color.White.copy(alpha = 0.1f))),
+                Brush.linearGradient(listOf(Color.White.copy(alpha = if (dark) 0.5f else 1f), tint.copy(alpha = 0.18f))),
                 CircleShape,
             ),
         contentAlignment = Alignment.Center,
