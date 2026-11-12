@@ -79,11 +79,8 @@ private fun isUserMedia(dir: String, root: String): Boolean {
 @Composable
 fun MediaFoldersScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
     val m by vm.media.collectAsStateWithLifecycle()
-    // Keep the last kind while the screen fades out, so it does not go blank before home appears.
-    val lastKind = remember { arrayOfNulls<MediaKind>(1) }
-    m.kind?.let { lastKind[0] = it }
-    val kind = m.kind ?: lastKind[0] ?: return
-    BackHandler(enabled = m.kind != null) { vm.closeMedia() }
+    val kind = m.kind ?: return
+    BackHandler { vm.closeMedia() }
     val root = vm.rootPath
     val stats by vm.stats.collectAsStateWithLifecycle()
     val storage by vm.storage.collectAsStateWithLifecycle()
@@ -149,13 +146,8 @@ fun MediaFoldersScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                 } else if (folders.isEmpty() && !m.scanning) {
                     item(key = "empty") { EmptyNote("هیچ پوشه‌ای با این نوع فایل در حافظه نیست.") }
                 }
-                items(folders.chunked(4), key = { row -> row.first().path }) { row ->
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-                        row.forEach { f ->
-                            Box(Modifier.weight(1f)) { FolderTile(f, vm) { vm.showMediaFolder(f.path) } }
-                        }
-                        repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
-                    }
+                items(folders, key = { it.path }) { f ->
+                    FolderRow(f, vm, root) { vm.showMediaFolder(f.path) }
                 }
             }
         }
@@ -169,29 +161,32 @@ private fun kindIcon(kind: MediaKind) = when (kind) {
 }
 
 @Composable
-private fun FolderTile(f: MediaFolderInfo, vm: BrowserViewModel, onClick: () -> Unit) {
-    Column(
+private fun FolderRow(f: MediaFolderInfo, vm: BrowserViewModel, root: String, onClick: () -> Unit) {
+    Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 2.dp, vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         // The newest file stands in as the folder's preview.
-        FileIcon(f.newest, vm.backend, 64.dp, selected = false)
-        Spacer(Modifier.height(6.dp))
-        Text(
-            f.path.substringAfterLast('/'),
-            style = MaterialTheme.typography.labelMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            "${faNum(f.count)} فایل",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        FileIcon(f.newest, vm.backend, 56.dp, selected = false)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(f.path.substringAfterLast('/'), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                "${faNum(f.count)} فایل • ${formatSize(f.size)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                f.path.removePrefix(root).trimStart('/').ifEmpty { "حافظه داخلی" },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -270,6 +265,7 @@ private fun UsageHeader(kind: MediaKind, stats: MediaStats, storage: LongArray?,
                 }
             }
         }
+        TextButton(onClick = onViewAll) { Text("مشاهده‌ی همه") }
     }
 }
 
@@ -290,6 +286,7 @@ private fun AudioCategories(stats: MediaStats, vm: BrowserViewModel) {
         AudioCat("همه‌ی آهنگ‌ها", Icons.Filled.PlayArrow, Color(0xFF1EA7D6), stats.tracks) { vm.openAudioList(AudioList.Tracks) },
         AudioCat("زنگ هشدار", Icons.Filled.Alarm, Color(0xFFE91E63), stats.alarms) { vm.openAudioList(AudioList.Alarms) },
         AudioCat("زنگ تماس", Icons.Filled.Call, Color(0xFF6C4DD3), stats.ringtones) { vm.openAudioList(AudioList.Ringtones) },
+        AudioCat("اعلان‌ها", Icons.Filled.Notifications, Color(0xFF9C27B0), stats.notifications) { vm.openAudioList(AudioList.Notifications) },
         AudioCat("پادکست‌ها", Icons.Filled.Headset, Color(0xFF3F51B5), stats.podcasts) { vm.openAudioList(AudioList.Podcasts) },
     )
     Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp)) {

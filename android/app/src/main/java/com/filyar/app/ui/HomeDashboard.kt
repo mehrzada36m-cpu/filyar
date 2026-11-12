@@ -1,5 +1,16 @@
 package com.filyar.app.ui
 
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.filled.FolderOff
@@ -77,7 +88,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.filyar.app.core.ShizukuStatus
 import com.filyar.app.core.formatSize
-import com.filyar.app.core.faNum
 import com.filyar.app.ui.theme.Filyar
 
 /** Persian names for the default quick access folders. */
@@ -115,8 +125,10 @@ fun HomeDashboard(
     stats: MediaStats = MediaStats(),
     onOpenApps: () -> Unit = {},
 ) {
-    if (style == HomeStyle.Classic) {
-        ClassicHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onGrantLocal, onRemoveQuick, onAddQuick, onCustomizeQuick, onOpenCleaner, onOpenMedia, onOpenBackups, listState, stats, onOpenApps)
+    if (style != HomeStyle.Cards) {
+        CompositionLocalProvider(LocalGlass provides (style == HomeStyle.Glass)) {
+            ClassicHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onGrantLocal, onRemoveQuick, onAddQuick, onCustomizeQuick, onOpenCleaner, onOpenMedia, onOpenBackups, listState, stats, onOpenApps)
+        }
     } else {
         CardsHome(rootPath, shizuku, localAccess, storage, quickAccess, onOpen, onShizukuAction, onShowGuide, onGrantLocal, onRemoveQuick, onAddQuick, onCustomizeQuick, onOpenCleaner, onOpenBackups, listState)
     }
@@ -147,7 +159,13 @@ private fun CardsHome(
 
         if (!localAccess && shizuku != ShizukuStatus.Ready) {
             item(key = "local") {
-                PermissionCapsule(onGrantLocal)
+                InfoCard(
+                    icon = Icons.Filled.LockOpen,
+                    title = "دسترسی به حافظه",
+                    body = "برای مرور پوشه‌های معمولی بدون Shizuku، اجازه‌ی دسترسی به همه‌ی فایل‌ها را بدهید.",
+                    action = "اجازه دادن",
+                    onAction = onGrantLocal,
+                )
             }
         }
 
@@ -466,10 +484,17 @@ private fun QuickTile(
     val name = path.substringAfterLast('/')
     val label = friendlyNames[rel] ?: name
     val sub = if (friendlyNames.containsKey(rel)) rel else path.substringBeforeLast('/').removePrefix(rootPath).trimStart('/').ifEmpty { "حافظه داخلی" }
+    val glass = LocalGlass.current
     Box(
-        modifier
-            .clip(RoundedCornerShape(22.dp))
-            .then(if (card) Modifier.background(MaterialTheme.colorScheme.surfaceContainerLow) else Modifier)
+        (
+            if (glass) {
+                modifier.padding(5.dp).glassSurface()
+            } else {
+                modifier
+                    .clip(RoundedCornerShape(22.dp))
+                    .then(if (card) Modifier.background(MaterialTheme.colorScheme.surfaceContainerLow) else Modifier)
+            }
+            )
             .combinedClickable(onClick = onClick, onLongClick = { menu = true }),
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -503,53 +528,6 @@ private fun QuickTile(
                     onRemove()
                 },
             )
-        }
-    }
-}
-
-// Shown only on the first launch after install; the × hides it right away.
-private var permCardFirstRun: Boolean? = null
-private var permCardDismissed by mutableStateOf(false)
-
-@Composable
-private fun PermissionCapsule(onGrant: () -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    if (permCardFirstRun == null) {
-        val sp = context.getSharedPreferences("filyar_ui", android.content.Context.MODE_PRIVATE)
-        permCardFirstRun = !sp.getBoolean("perm_card_seen", false)
-        sp.edit().putBoolean("perm_card_seen", true).apply()
-    }
-    if (permCardFirstRun != true || permCardDismissed) return
-    val fg = MaterialTheme.colorScheme.onTertiaryContainer
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-    ) {
-        Row(
-            Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Filled.LockOpen, null, tint = fg, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(10.dp))
-            Text(
-                "دسترسی به همه‌ی فایل‌ها",
-                style = MaterialTheme.typography.labelLarge,
-                color = fg,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            Button(
-                onClick = onGrant,
-                modifier = Modifier.height(34.dp),
-                contentPadding = PaddingValues(horizontal = 14.dp),
-            ) { Text("اجازه دادن", style = MaterialTheme.typography.labelMedium) }
-            IconButton(onClick = { permCardDismissed = true }, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Filled.Close, "بستن", tint = fg, modifier = Modifier.size(18.dp))
-            }
         }
     }
 }
@@ -591,6 +569,47 @@ private fun ClassicSection(title: String, trailing: (@Composable () -> Unit)? = 
     }
 }
 
+/** True while the home screen is drawn as frosted glass. */
+private val LocalGlass = compositionLocalOf { false }
+
+/** A translucent, softly lit card with a bright rim and a gentle shadow. */
+@Composable
+private fun Modifier.glassSurface(shape: Shape = RoundedCornerShape(26.dp)): Modifier {
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val fillTop = Color.White.copy(alpha = if (dark) 0.12f else 0.85f)
+    val fillBottom = Color.White.copy(alpha = if (dark) 0.05f else 0.45f)
+    val rimStart = Color.White.copy(alpha = if (dark) 0.35f else 0.95f)
+    val rimEnd = Color.White.copy(alpha = if (dark) 0.05f else 0.25f)
+    val shade = Color.Black.copy(alpha = if (dark) 0.5f else 0.14f)
+    return this
+        .shadow(10.dp, shape, ambientColor = shade, spotColor = shade)
+        .clip(shape)
+        .background(Brush.verticalGradient(listOf(fillTop, fillBottom)))
+        .border(1.dp, Brush.linearGradient(listOf(rimStart, rimEnd)), shape)
+}
+
+/** A glossy round badge: a tinted gradient with a bright highlight in the upper corner. */
+@Composable
+private fun GlassBubble(icon: ImageVector, tint: Color, size: androidx.compose.ui.unit.Dp) {
+    Box(
+        Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(Brush.linearGradient(listOf(tint.copy(alpha = 0.34f), tint.copy(alpha = 0.10f))))
+            .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(alpha = 0.9f), Color.White.copy(alpha = 0.15f))), CircleShape)
+            .drawBehind {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        listOf(Color.White.copy(alpha = 0.55f), Color.Transparent),
+                        center = Offset(this.size.width * 0.32f, this.size.height * 0.26f),
+                        radius = this.size.width * 0.55f,
+                    ),
+                )
+            },
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, null, tint = tint) }
+}
+
 @Composable
 private fun ClassicTile(
     icon: ImageVector,
@@ -600,20 +619,24 @@ private fun ClassicTile(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
+    val glass = LocalGlass.current
     Row(
-        modifier
-            .clip(RoundedCornerShape(16.dp))
+        (if (glass) modifier.padding(5.dp).glassSurface() else modifier.clip(RoundedCornerShape(16.dp)))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(tint.copy(alpha = 0.16f)),
-            contentAlignment = Alignment.Center,
-        ) { Icon(icon, null, tint = tint) }
+        if (glass) {
+            GlassBubble(icon, tint, 52.dp)
+        } else {
+            Box(
+                Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(tint.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center,
+            ) { Icon(icon, null, tint = tint) }
+        }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -659,10 +682,23 @@ private fun ClassicHome(
     val purple = Color(0xFF7C6BE0)
     val amber = Color(0xFFD98A1B)
 
-    LazyColumn(state = listState, contentPadding = PaddingValues(top = 0.dp, bottom = 32.dp)) {
+    val glass = LocalGlass.current
+    val glow = if (glass) Modifier.background(Brush.verticalGradient(listOf(scheme.background, lerp(scheme.background, scheme.primary, 0.08f)))) else Modifier
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().then(glow),
+        state = listState,
+        contentPadding = PaddingValues(top = 0.dp, bottom = 32.dp),
+    ) {
         if (!localAccess && shizuku != ShizukuStatus.Ready) {
             item(key = "local") {
-                PermissionCapsule(onGrantLocal)
+                Spacer(Modifier.height(8.dp))
+                InfoCard(
+                    icon = Icons.Filled.LockOpen,
+                    title = "دسترسی به حافظه",
+                    body = "برای مرور پوشه‌های معمولی بدون Shizuku، اجازه‌ی دسترسی به همه‌ی فایل‌ها را بدهید.",
+                    action = "اجازه دادن",
+                    onAction = onGrantLocal,
+                )
             }
         }
 
@@ -671,14 +707,14 @@ private fun ClassicHome(
             ClassicTile(
                 Icons.Filled.PhoneAndroid, blue, "حافظه داخلی",
                 (if (total > 0) "${formatSize(total)} • ${formatSize(free)} خالی\n" else "") + rootPath,
-                Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                Modifier.fillMaxWidth(),
             ) { onOpen(rootPath) }
         }
         item(key = "data") {
             ClassicTile(
                 Icons.Filled.FolderSpecial, amber, "Android/data",
                 "دیتای برنامه‌ها و بازی‌ها",
-                Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                Modifier.fillMaxWidth(),
             ) { onOpen("$rootPath/Android/data") }
         }
 
@@ -691,7 +727,7 @@ private fun ClassicHome(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 5.dp),
+                    .padding(horizontal = 14.dp, vertical = 5.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 row.forEach { path ->
@@ -711,7 +747,7 @@ private fun ClassicHome(
 
         item(key = "mediaTitle") { ClassicSection("رسانه") }
         item(key = "media1") {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
                 ClassicTile(
                     Icons.Filled.Image, blue, "تصاویر",
                     if (stats.loaded) "${faNum(stats.images)} تصویر • ${formatSize(stats.imageBytes)}\n${faNum(stats.cameraImages)} عکس دوربین" else "پوشه‌های دارای عکس",
@@ -725,7 +761,7 @@ private fun ClassicHome(
             }
         }
         item(key = "media2") {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
                 ClassicTile(
                     Icons.Filled.MusicNote, teal, "موسیقی",
                     if (stats.loaded) {
@@ -745,7 +781,7 @@ private fun ClassicHome(
 
         item(key = "toolsTitle") { ClassicSection("ابزارها") }
         item(key = "tools") {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
                 ClassicTile(Icons.Filled.SdStorage, purple, "فایل‌های بزرگ", "پاکسازی فایل‌های حجیم", Modifier.weight(1f)) {
                     onOpenCleaner(CleanMode.Large)
                 }
@@ -755,7 +791,7 @@ private fun ClassicHome(
             }
         }
         item(key = "tools2") {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
                 ClassicTile(Icons.Filled.FolderOff, red, "پوشه‌های باقی‌مانده", "دیتای برنامه‌های حذف‌شده", Modifier.weight(1f)) {
                     onOpenCleaner(CleanMode.Leftovers)
                 }
@@ -765,7 +801,7 @@ private fun ClassicHome(
             }
         }
         item(key = "tools3") {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
                 ClassicTile(Icons.Filled.Backup, amber, "پشتیبان‌ها", "پشتیبان دیتای برنامه‌ها", Modifier.weight(1f)) { onOpenBackups() }
                 Spacer(Modifier.weight(1f))
             }

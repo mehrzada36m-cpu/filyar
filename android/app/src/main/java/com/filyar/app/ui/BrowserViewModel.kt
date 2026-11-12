@@ -54,8 +54,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import java.io.IOException
 
 enum class ErrorKind { NeedsShizuku, NeedsPermission, Generic }
@@ -81,7 +79,6 @@ data class OpProgress(val title: String, val current: String = "", val fraction:
 sealed interface UiEvent {
     data class Edit(val file: RemoteFile) : UiEvent
     data class ViewImage(val file: RemoteFile) : UiEvent
-    data class Play(val file: RemoteFile) : UiEvent
 
     /** An intent for another app; it is started from the Activity so it opens on top of this app. */
     data class Launch(val intent: Intent) : UiEvent
@@ -1166,10 +1163,6 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     val appsOpen: StateFlow<Boolean> = _appsOpen.asStateFlow()
     private val _apps = MutableStateFlow<List<AppEntry>?>(null)
     val apps: StateFlow<List<AppEntry>?> = _apps.asStateFlow()
-    private val _appsTab = MutableStateFlow(1)
-    /** 1 = installed apps, 2 = system apps (0 is the APK-files screen). */
-    val appsTab: StateFlow<Int> = _appsTab.asStateFlow()
-    fun setAppsTab(tab: Int) { _appsTab.value = tab }
 
     fun openApps() {
         _appsOpen.value = true
@@ -1314,105 +1307,8 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
         when {
             isEditable(f) -> eventChannel.trySend(UiEvent.Edit(f))
             kindOf(f) == FileKind.Image && f.extension != "svg" -> eventChannel.trySend(UiEvent.ViewImage(f))
-            (kindOf(f) == FileKind.Video || kindOf(f) == FileKind.Audio) && f.extension != "ts" ->
-                if (File(f.path).canRead() && !isRestricted(f.path)) eventChannel.trySend(UiEvent.Play(f)) else openExternal(f, chooser = false)
-            f.extension == "apk" -> _apkPrompt.value = f
-            f.extension == "zip" -> _zipPrompt.value = f
             else -> openExternal(f, chooser = false)
         }
-    }
-
-    // ---------- home screen background picture ----------
-    private val _homeBg = MutableStateFlow<ImageBitmap?>(null)
-    val homeBg: StateFlow<ImageBitmap?> = _homeBg.asStateFlow()
-
-    private fun homeBgFile() = File(getApplication<Application>().filesDir, "home_bg.jpg")
-
-    init { loadHomeBg() }
-
-    private fun loadHomeBg() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val f = homeBgFile()
-            _homeBg.value = if (f.exists()) runCatching { android.graphics.BitmapFactory.decodeFile(f.path)?.asImageBitmap() }.getOrNull() else null
-        }
-    }
-
-    /** Copies the picked picture into the app (scaled down, rotated upright) so it keeps working if the original moves. */
-    fun setHomeBackground(uri: Uri) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val cr = getApplication<Application>().contentResolver
-                val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                cr.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
-                var sample = 1
-                while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 1600) sample *= 2
-                val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
-                var bmp = cr.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, opts) }
-                    ?: throw IOException("خواندن تصویر ممکن نشد")
-                val orientation = runCatching {
-                    cr.openInputStream(uri)?.use {
-                        android.media.ExifInterface(it).getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, android.media.ExifInterface.ORIENTATION_NORMAL)
-                    }
-                }.getOrNull() ?: android.media.ExifInterface.ORIENTATION_NORMAL
-                val matrix = android.graphics.Matrix()
-                when (orientation) {
-                    android.media.ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
-                    android.media.ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
-                    android.media.ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
-                    else -> {}
-                }
-                if (!matrix.isIdentity) bmp = android.graphics.Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
-                homeBgFile().outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 88, it) }
-                _homeBg.value = bmp.asImageBitmap()
-                toast("تصویر زمینه تنظیم شد")
-            } catch (e: Throwable) {
-                toast(e.message ?: "تنظیم تصویر ممکن نشد")
-            }
-        }
-    }
-
-    fun removeHomeBackground() {
-        homeBgFile().delete()
-        _homeBg.value = null
-    }
-
-    // ---------- built-in installer and ZIP preview ----------
-    private val _apkPrompt = MutableStateFlow<RemoteFile?>(null)
-    val apkPrompt: StateFlow<RemoteFile?> = _apkPrompt.asStateFlow()
-    private val _zipPrompt = MutableStateFlow<RemoteFile?>(null)
-    val zipPrompt: StateFlow<RemoteFile?> = _zipPrompt.asStateFlow()
-
-    fun dismissApkPrompt() { _apkPrompt.value = null }
-    fun dismissZipPrompt() { _zipPrompt.value = null }
-
-    /** Starts the system installer; asks for the "install unknown apps" switch first when it is off. */
-    fun installApk(f: RemoteFile) {
-        val app = getApplication<Application>()
-        if (Build.VERSION.SDK_INT >= 26 && !app.packageManager.canRequestPackageInstalls()) {
-            toast("اجازه‌ی نصب برنامه را روشن کنید، بعد دوباره نصب را بزنید")
-            eventChannel.trySend(UiEvent.Launch(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${app.packageName}"))))
-            return
-        }
-        openExternal(f, chooser = false)
-    }
-
-    suspend fun zipEntries(f: RemoteFile): List<Pair<String, Long>> = withContext(Dispatchers.IO) {
-        runCatching {
-            val local = File(f.path)
-            if (local.canRead() && !isRestricted(f.path)) {
-                java.util.zip.ZipFile(local).use { z -> z.entries().asSequence().map { it.name to it.size }.toList() }
-            } else {
-                val out = ArrayList<Pair<String, Long>>()
-                java.util.zip.ZipInputStream(backend.openInput(f.path).buffered()).use { zis ->
-                    while (true) {
-                        val e = zis.nextEntry ?: break
-                        out.add(e.name to e.size)
-                        zis.closeEntry()
-                    }
-                }
-                out
-            }
-        }.getOrDefault(emptyList())
     }
 
     fun openAsText(f: RemoteFile) {

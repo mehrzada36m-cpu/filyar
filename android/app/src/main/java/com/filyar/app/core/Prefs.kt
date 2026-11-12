@@ -14,8 +14,8 @@ enum class LongPressAction { Icon, Select }
 /** How a folder is drawn: rounded tile, circle, bare icon, or outlined tile. */
 enum class FolderModel { Tile, Circle, Plain, Outline }
 
-/** Home screen layout: big cards, or a classic sectioned list. */
-enum class HomeStyle { Cards, Classic }
+/** Home screen layout: big cards, a classic sectioned list, or the same list drawn as frosted glass. */
+enum class HomeStyle { Cards, Classic, Glass }
 
 data class ViewPrefs(
     val sort: SortBy = SortBy.Name,

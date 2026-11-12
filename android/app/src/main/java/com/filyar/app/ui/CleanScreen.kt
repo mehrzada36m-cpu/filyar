@@ -88,11 +88,8 @@ private const val MB = 1024L * 1024
 @Composable
 fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
     val c by vm.clean.collectAsStateWithLifecycle()
-    // Keep the last mode while the screen fades out, so it does not go blank first.
-    val lastMode = remember { arrayOfNulls<CleanMode>(1) }
-    c.mode?.let { lastMode[0] = it }
-    val mode = c.mode ?: lastMode[0] ?: return
-    BackHandler(enabled = c.mode != null) { vm.closeClean() }
+    val mode = c.mode ?: return
+    BackHandler { vm.closeClean() }
 
     val listState = vm.cleanListState(mode)
     var confirm by remember { mutableStateOf<List<RemoteFile>?>(null) }
@@ -219,13 +216,6 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                     },
                 )
             } else if (mode == CleanMode.Apks) {
-                AppsCapsule(selected = 0) { i ->
-                    if (i != 0) {
-                        vm.setAppsTab(i)
-                        vm.openApps()
-                        vm.closeClean()
-                    }
-                }
                 Text(
                     "فایل‌های apk، apks، xapk و apkm در همه‌ی حافظه. برای دیدن آن‌ها داخل Android/data باید Shizuku روشن باشد.",
                     style = MaterialTheme.typography.bodySmall,
@@ -278,10 +268,10 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                                 f, backend, info,
                                 checked = f.path in c.selection,
                                 selectionMode = selecting,
-                                onClick = { if (selecting) vm.cleanToggle(f.path) else vm.open(f) },
+                                onClick = { if (selecting) vm.cleanToggle(f.path) else vm.openExternal(f, chooser = false) },
                                 onLongClick = { vm.cleanToggle(f.path) },
                                 onInfo = { infoDialog = f to info },
-                                onInstall = if (f.extension == "apk") ({ vm.installApk(f) }) else null,
+                                onInstall = if (f.extension == "apk") ({ vm.openExternal(f, chooser = false) }) else null,
                                 onFolder = { vm.showInFolder(f.path) },
                             )
                         }

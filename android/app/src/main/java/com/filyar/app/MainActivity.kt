@@ -42,9 +42,6 @@ import com.filyar.app.ui.LocalViewPrefs
 import com.filyar.app.ui.SettingsScreen
 import com.filyar.app.ui.ImageViewerScreen
 import com.filyar.app.ui.ProgressDialog
-import com.filyar.app.ui.ApkInstallDialog
-import com.filyar.app.ui.PlayerScreen
-import com.filyar.app.ui.ZipPreviewDialog
 import com.filyar.app.ui.UiEvent
 import com.filyar.app.ui.theme.FilyarTheme
 import com.filyar.app.ui.theme.isDarkTheme
@@ -53,7 +50,6 @@ private sealed interface Screen {
     data object Browser : Screen
     data class Editor(val file: RemoteFile) : Screen
     data class Viewer(val file: RemoteFile) : Screen
-    data class Player(val file: RemoteFile) : Screen
     data object Settings : Screen
     data object Clean : Screen
     data object Media : Screen
@@ -122,7 +118,6 @@ private fun AppRoot(vm: BrowserViewModel) {
             when (it) {
                 is UiEvent.Edit -> base = Screen.Editor(it.file)
                 is UiEvent.ViewImage -> base = Screen.Viewer(it.file)
-                is UiEvent.Play -> base = Screen.Player(it.file)
                 is UiEvent.Launch -> try {
                     context.startActivity(it.intent)
                 } catch (_: ActivityNotFoundException) {
@@ -140,14 +135,7 @@ private fun AppRoot(vm: BrowserViewModel) {
 
     AnimatedContent(
         targetState = screen,
-        transitionSpec = {
-            if (targetState == Screen.Browser) {
-                // Coming back home: a plain, quick crossfade with no sliding.
-                fadeIn(tween(150)) togetherWith fadeOut(tween(150))
-            } else {
-                (fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 14 }) togetherWith fadeOut(tween(140))
-            }
-        },
+        transitionSpec = { (fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 14 }) togetherWith fadeOut(tween(140)) },
         label = "screen",
     ) { s ->
         when (s) {
@@ -159,14 +147,8 @@ private fun AppRoot(vm: BrowserViewModel) {
             Screen.Settings -> SettingsScreen(vm, snackbar) { base = Screen.Browser }
             is Screen.Editor -> EditorScreen(s.file, vm, snackbar) { base = Screen.Browser }
             is Screen.Viewer -> ImageViewerScreen(s.file, vm) { base = Screen.Browser }
-            is Screen.Player -> PlayerScreen(s.file) { base = Screen.Browser }
         }
     }
-
-    val apkPrompt by vm.apkPrompt.collectAsStateWithLifecycle()
-    val zipPrompt by vm.zipPrompt.collectAsStateWithLifecycle()
-    apkPrompt?.let { ApkInstallDialog(it, vm) }
-    zipPrompt?.let { ZipPreviewDialog(it, vm) }
 
     progress?.let { ProgressDialog(it, onCancel = vm::cancelOp) }
 }
