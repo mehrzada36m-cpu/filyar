@@ -570,11 +570,8 @@ private fun MainTopBar(
     onShizuku: () -> Unit,
 ) {
     var moreOpen by remember { mutableStateOf(false) }
-    // Always see-through (a frosted tint in the glass style), so it never changes shade when moving between screens.
-    val barColor by animateColorAsState(
-        if (atHome && frosted) MaterialTheme.colorScheme.surface.copy(alpha = 0.28f) else Color.Transparent,
-        label = "bar",
-    )
+    // Always see-through, so the header is exactly the background colour on every screen and never changes shade.
+    val barColor = Color.Transparent
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(containerColor = barColor, scrolledContainerColor = barColor),
         navigationIcon = {

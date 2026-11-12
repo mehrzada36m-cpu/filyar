@@ -107,14 +107,23 @@ fun HomeBackdrop(image: ImageBitmap?, blurPct: Int, glass: Boolean, modifier: Mo
                 Brush.verticalGradient(listOf(scheme.background, scheme.background))
             }
             Box(Modifier.fillMaxSize().background(base))
-            if (canBlur) {
-                Canvas(Modifier.fillMaxSize().blur((24 + blurPct * 0.6f).dp, BlurredEdgeTreatment.Unbounded)) {
-                    val a = if (dark) 0.30f else 0.26f
-                    val m = this.size.minDimension
-                    drawCircle(scheme.primary.copy(alpha = a), radius = m * 0.45f, center = Offset(this.size.width * 0.85f, this.size.height * 0.12f))
-                    drawCircle(scheme.tertiary.copy(alpha = a), radius = m * 0.40f, center = Offset(this.size.width * 0.10f, this.size.height * 0.45f))
-                    drawCircle(scheme.secondary.copy(alpha = a), radius = m * 0.42f, center = Offset(this.size.width * 0.80f, this.size.height * 0.88f))
+            // Soft colour glows drawn as radial gradients (no blur layer, so no seams); the slider widens them.
+            Canvas(Modifier.fillMaxSize()) {
+                val a = if (dark) 0.34f else 0.30f
+                val m = this.size.minDimension
+                val k = 0.40f + 0.35f * blurPct / 100f
+                fun glow(c: Color, cx: Float, cy: Float, rf: Float) {
+                    val center = Offset(this.size.width * cx, this.size.height * cy)
+                    val radius = m * rf * k * 2f
+                    drawCircle(
+                        brush = Brush.radialGradient(listOf(c.copy(alpha = a), Color.Transparent), center = center, radius = radius),
+                        radius = radius,
+                        center = center,
+                    )
                 }
+                glow(scheme.primary, 0.85f, 0.12f, 0.45f)
+                glow(scheme.tertiary, 0.10f, 0.45f, 0.40f)
+                glow(scheme.secondary, 0.80f, 0.88f, 0.42f)
             }
         }
     }
