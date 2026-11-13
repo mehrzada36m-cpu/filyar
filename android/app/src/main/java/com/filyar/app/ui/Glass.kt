@@ -101,7 +101,7 @@ fun HomeBackdrop(image: ImageBitmap?, blurPct: Int, glass: Boolean, modifier: Mo
         } else {
             val base = if (glass) {
                 Brush.verticalGradient(
-                    if (dark) listOf(Color(0xFF1B1F24), Color(0xFF0E1013)) else listOf(Color(0xFFF8FAFC), Color(0xFFE3E7ED)),
+                    if (dark) listOf(Color(0xFF151B33), Color(0xFF0A0E1C)) else listOf(Color(0xFFF8FAFC), Color(0xFFE3E7ED)),
                 )
             } else {
                 Brush.verticalGradient(listOf(scheme.background, scheme.background))
@@ -109,21 +109,25 @@ fun HomeBackdrop(image: ImageBitmap?, blurPct: Int, glass: Boolean, modifier: Mo
             Box(Modifier.fillMaxSize().background(base))
             // Soft colour glows drawn as radial gradients (no blur layer, so no seams); the slider widens them.
             Canvas(Modifier.fillMaxSize()) {
-                val a = if (dark) 0.34f else 0.30f
+                val a = if (dark) 0.42f else 0.30f
                 val m = this.size.minDimension
                 val k = 0.40f + 0.35f * blurPct / 100f
+                // The glow fades to the same colour at zero opacity, and is painted over the whole canvas,
+                // so it has no visible edge.
                 fun glow(c: Color, cx: Float, cy: Float, rf: Float) {
                     val center = Offset(this.size.width * cx, this.size.height * cy)
-                    val radius = m * rf * k * 2f
-                    drawCircle(
-                        brush = Brush.radialGradient(listOf(c.copy(alpha = a), Color.Transparent), center = center, radius = radius),
-                        radius = radius,
-                        center = center,
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            listOf(c.copy(alpha = a), c.copy(alpha = 0f)),
+                            center = center,
+                            radius = m * rf * k * 2f,
+                        ),
                     )
                 }
-                glow(scheme.primary, 0.85f, 0.12f, 0.45f)
-                glow(scheme.tertiary, 0.10f, 0.45f, 0.40f)
-                glow(scheme.secondary, 0.80f, 0.88f, 0.42f)
+                // Dark mode uses fixed vivid colours: the dark theme's own colours are too dull to light up the glass.
+                glow(if (dark) Color(0xFF5B6CFF) else scheme.primary, 0.85f, 0.12f, 0.45f)
+                glow(if (dark) Color(0xFF14C8C0) else scheme.tertiary, 0.10f, 0.45f, 0.40f)
+                glow(if (dark) Color(0xFFD14BC8) else scheme.secondary, 0.80f, 0.88f, 0.42f)
             }
         }
     }

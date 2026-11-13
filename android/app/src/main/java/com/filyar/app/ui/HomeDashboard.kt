@@ -646,7 +646,7 @@ private fun ClassicSection(title: String, trailing: (@Composable () -> Unit)? = 
             .padding(start = 20.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+        Text(title, style = MaterialTheme.typography.titleSmall, color = if (LocalGlass.current && isDarkSurface()) Color(0xFF8AD8FF) else MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
         trailing?.invoke()
     }
 }
@@ -663,12 +663,12 @@ private fun Modifier.glassCard(radius: Dp = 20.dp): Modifier {
     val dark = isDarkSurface()
     val shape = RoundedCornerShape(radius)
     val fill = if (dark) {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.12f), Color.White.copy(alpha = 0.05f)))
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.17f), Color.White.copy(alpha = 0.04f)))
     } else {
         Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.46f), Color.White.copy(alpha = 0.18f)))
     }
     val rim = if (dark) {
-        Brush.linearGradient(listOf(Color.White.copy(alpha = 0.50f), Color.White.copy(alpha = 0.06f)))
+        Brush.linearGradient(listOf(Color.White.copy(alpha = 0.60f), Color.White.copy(alpha = 0.06f)))
     } else {
         Brush.linearGradient(listOf(Color.White, Color(0xFFB8C0CC).copy(alpha = 0.55f)))
     }
@@ -677,7 +677,8 @@ private fun Modifier.glassCard(radius: Dp = 20.dp): Modifier {
         .drawBehind {
             val r = radius.toPx()
             val dy = 3.dp.toPx()
-            listOf(7.dp to 0.012f, 4.dp to 0.018f, 2.dp to 0.026f).forEach { (grow, alpha) ->
+            val layers = if (dark) listOf(8.dp to 0.10f, 4.dp to 0.16f, 2.dp to 0.24f) else listOf(7.dp to 0.012f, 4.dp to 0.018f, 2.dp to 0.026f)
+            layers.forEach { (grow, alpha) ->
                 val g = grow.toPx()
                 drawRoundRect(
                     color = shadowColor.copy(alpha = alpha),
@@ -700,7 +701,7 @@ private fun GlassBubble(tint: Color, size: Dp = 52.dp, content: @Composable () -
         Modifier
             .size(size)
             .drawBehind {
-                listOf(6.dp to 0.06f, 3.dp to 0.09f).forEach { (grow, alpha) ->
+                (if (dark) listOf(7.dp to 0.20f, 3.dp to 0.30f) else listOf(6.dp to 0.06f, 3.dp to 0.09f)).forEach { (grow, alpha) ->
                     drawCircle(
                         color = tint.copy(alpha = alpha),
                         radius = this.size.minDimension / 2 + grow.toPx(),
@@ -711,12 +712,12 @@ private fun GlassBubble(tint: Color, size: Dp = 52.dp, content: @Composable () -
             .clip(CircleShape)
             .background(
                 Brush.linearGradient(
-                    listOf(Color.White.copy(alpha = if (dark) 0.30f else 0.95f), tint.copy(alpha = if (dark) 0.30f else 0.26f)),
+                    listOf(Color.White.copy(alpha = if (dark) 0.42f else 0.95f), tint.copy(alpha = if (dark) 0.50f else 0.26f)),
                 ),
             )
             .border(
                 1.dp,
-                Brush.linearGradient(listOf(Color.White.copy(alpha = if (dark) 0.5f else 1f), tint.copy(alpha = 0.18f))),
+                Brush.linearGradient(listOf(Color.White.copy(alpha = if (dark) 0.65f else 1f), tint.copy(alpha = if (dark) 0.25f else 0.18f))),
                 CircleShape,
             ),
         contentAlignment = Alignment.Center,
