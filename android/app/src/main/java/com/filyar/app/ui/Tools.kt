@@ -1,6 +1,20 @@
 package com.filyar.app.ui
 
 import android.net.Uri
+import kotlinx.coroutines.delay
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.clip
+import androidx.compose.material3.Slider
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.border
+import android.media.MediaPlayer
 import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.MediaController
@@ -212,4 +226,119 @@ fun ZipPreviewDialog(file: RemoteFile, vm: BrowserViewModel) {
         },
         dismissButton = { TextButton(onClick = vm::dismissZipPrompt) { Text("بستن") } },
     )
+}
+
+private fun clock(ms: Int): String {
+    val total = ms / 1000
+    return "${faNum(total / 60)}:${faNum(total % 60).padStart(2, '۰')}"
+}
+
+/**
+ * Floating, frosted audio player that sits at the bottom of the screen. It keeps playing while you
+ * browse, and the × stops it.
+ */
+@Composable
+fun MiniPlayer(file: RemoteFile, onClose: () -> Unit, modifier: Modifier = Modifier) {
+    val player = remember(file.path) { MediaPlayer() }
+    var ready by remember(file.path) { mutableStateOf(false) }
+    var playing by remember(file.path) { mutableStateOf(false) }
+    var failed by remember(file.path) { mutableStateOf(false) }
+    var duration by remember(file.path) { mutableStateOf(0) }
+    var position by remember(file.path) { mutableStateOf(0) }
+    var dragging by remember(file.path) { mutableStateOf(false) }
+    var dragValue by remember(file.path) { mutableStateOf(0f) }
+
+    DisposableEffect(file.path) {
+        try {
+            player.setDataSource(file.path)
+            player.setOnPreparedListener { mp ->
+                duration = mp.duration
+                ready = true
+                mp.start()
+                playing = true
+            }
+            player.setOnCompletionListener {
+                playing = false
+                position = duration
+            }
+            player.setOnErrorListener { _, _, _ ->
+                failed = true
+                playing = false
+                true
+            }
+            player.prepareAsync()
+        } catch (e: Exception) {
+            failed = true
+        }
+        onDispose { runCatching { player.release() } }
+    }
+    LaunchedEffect(playing, ready, file.path) {
+        while (playing && ready) {
+            if (!dragging) position = runCatching { player.currentPosition }.getOrDefault(0)
+            delay(300)
+        }
+    }
+
+    val scheme = MaterialTheme.colorScheme
+    val dark = scheme.background.luminance() < 0.5f
+    val shape = RoundedCornerShape(24.dp)
+    val rim = Brush.linearGradient(
+        listOf(Color.White.copy(alpha = if (dark) 0.30f else 1f), Color.White.copy(alpha = if (dark) 0.06f else 0.35f)),
+    )
+    Column(
+        modifier
+            .fillMaxWidth()
+            .shadow(10.dp, shape, ambientColor = Color.Black.copy(alpha = 0.25f), spotColor = Color.Black.copy(alpha = 0.25f))
+            .clip(shape)
+            .background(Brush.verticalGradient(listOf(scheme.surfaceContainerHigh.copy(alpha = 0.92f), scheme.surfaceContainer.copy(alpha = 0.80f))))
+            .border(1.dp, rim, shape)
+            .padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 2.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(40.dp).clip(CircleShape).background(scheme.primary.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center,
+            ) { Icon(Icons.Filled.MusicNote, null, tint = scheme.primary, modifier = Modifier.size(22.dp)) }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(file.name.substringBeforeLast('.'), style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    if (failed) "پخش ممکن نشد" else "${clock(if (dragging) (dragValue * duration).toInt() else position)} / ${clock(duration)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = scheme.onSurfaceVariant,
+                )
+            }
+            IconButton(
+                onClick = {
+                    if (ready) {
+                        if (playing) {
+                            player.pause()
+                            playing = false
+                        } else {
+                            player.start()
+                            playing = true
+                        }
+                    }
+                },
+            ) { Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (playing) "توقف" else "پخش") }
+            IconButton(onClick = onClose) { Icon(Icons.Filled.Close, "بستن پخش‌کننده") }
+        }
+        Slider(
+            value = if (dragging) dragValue else if (duration > 0) position.toFloat() / duration else 0f,
+            onValueChange = {
+                dragging = true
+                dragValue = it
+            },
+            onValueChangeFinished = {
+                if (ready && duration > 0) {
+                    val target = (dragValue * duration).toInt()
+                    player.seekTo(target)
+                    position = target
+                }
+                dragging = false
+            },
+            enabled = ready,
+            modifier = Modifier.height(28.dp).padding(end = 8.dp),
+        )
+    }
 }

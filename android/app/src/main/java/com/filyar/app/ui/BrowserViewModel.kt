@@ -1318,7 +1318,11 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
             isEditable(f) -> eventChannel.trySend(UiEvent.Edit(f))
             kindOf(f) == FileKind.Image && f.extension != "svg" -> eventChannel.trySend(UiEvent.ViewImage(f))
             (kindOf(f) == FileKind.Video || kindOf(f) == FileKind.Audio) && f.extension != "ts" ->
-                if (File(f.path).canRead() && !isRestricted(f.path)) eventChannel.trySend(UiEvent.Play(f)) else openExternal(f, chooser = false)
+                if (File(f.path).canRead() && !isRestricted(f.path)) {
+                    if (kindOf(f) == FileKind.Audio) _miniPlayer.value = f else eventChannel.trySend(UiEvent.Play(f))
+                } else {
+                    openExternal(f, chooser = false)
+                }
             f.extension == "apk" -> _apkPrompt.value = f
             f.extension == "zip" -> _zipPrompt.value = f
             else -> openExternal(f, chooser = false)
@@ -1380,6 +1384,11 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ---------- built-in installer and ZIP preview ----------
+    private val _miniPlayer = MutableStateFlow<RemoteFile?>(null)
+    /** The audio file playing in the floating mini player, if any. */
+    val miniPlayer: StateFlow<RemoteFile?> = _miniPlayer.asStateFlow()
+    fun closeMiniPlayer() { _miniPlayer.value = null }
+
     private val _apkPrompt = MutableStateFlow<RemoteFile?>(null)
     val apkPrompt: StateFlow<RemoteFile?> = _apkPrompt.asStateFlow()
     private val _zipPrompt = MutableStateFlow<RemoteFile?>(null)

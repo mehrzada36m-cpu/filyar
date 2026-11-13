@@ -113,6 +113,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.paint
 import androidx.compose.ui.graphics.painter.BitmapPainter
@@ -740,12 +743,37 @@ private fun SearchTopBar(query: String, path: String?, rootPath: String, onQuery
 
 @Composable
 private fun SelectionBottomBar(onCopy: () -> Unit, onCut: () -> Unit, onShare: () -> Unit, onDelete: () -> Unit, onMore: () -> Unit) {
-    BottomAppBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
-        BarAction(Icons.Filled.ContentCopy, "کپی", Modifier.weight(1f), onCopy)
-        BarAction(Icons.Filled.ContentCut, "انتقال", Modifier.weight(1f), onCut)
-        BarAction(Icons.Filled.Share, "ارسال", Modifier.weight(1f), onShare)
-        BarAction(Icons.Filled.Delete, "حذف", Modifier.weight(1f), onDelete)
-        BarAction(Icons.Filled.MoreVert, "بیشتر", Modifier.weight(1f), onMore)
+    val scheme = MaterialTheme.colorScheme
+    val dark = scheme.background.luminance() < 0.5f
+    val shape = RoundedCornerShape(50)
+    val rim = Brush.linearGradient(
+        listOf(Color.White.copy(alpha = if (dark) 0.30f else 1f), Color.White.copy(alpha = if (dark) 0.06f else 0.35f)),
+    )
+    // A narrow floating capsule with icon-only actions.
+    Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 12.dp), contentAlignment = Alignment.Center) {
+        Row(
+            Modifier
+                .shadow(8.dp, shape, ambientColor = Color.Black.copy(alpha = 0.25f), spotColor = Color.Black.copy(alpha = 0.25f))
+                .clip(shape)
+                .background(Brush.verticalGradient(listOf(scheme.surfaceContainerHigh.copy(alpha = 0.92f), scheme.surfaceContainer.copy(alpha = 0.80f))))
+                .border(1.dp, rim, shape)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CapsuleAction(Icons.Filled.ContentCopy, "کپی", onCopy)
+            CapsuleAction(Icons.Filled.ContentCut, "انتقال", onCut)
+            CapsuleAction(Icons.Filled.Delete, "حذف", onDelete, tint = scheme.error)
+            CapsuleAction(Icons.Filled.Share, "ارسال", onShare)
+            CapsuleAction(Icons.Filled.MoreVert, "بیشتر", onMore)
+        }
+    }
+}
+
+@Composable
+private fun CapsuleAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit, tint: Color = Color.Unspecified) {
+    IconButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
+        Icon(icon, label, tint = tint, modifier = Modifier.size(22.dp))
     }
 }
 
