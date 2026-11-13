@@ -77,7 +77,7 @@ fun GlassFolderIcon(size: Dp, variant: Int, modifier: Modifier = Modifier) {
  * glows. [blurPct] (0–100) sets how blurred it is; blurring needs Android 12 or newer.
  */
 @Composable
-fun HomeBackdrop(image: ImageBitmap?, blurPct: Int, glass: Boolean, modifier: Modifier = Modifier) {
+fun HomeBackdrop(image: ImageBitmap?, blurPct: Int, glass: Boolean, modifier: Modifier = Modifier, dense: Boolean = false) {
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < 0.5f
     val canBlur = Build.VERSION.SDK_INT >= 31
@@ -97,7 +97,7 @@ fun HomeBackdrop(image: ImageBitmap?, blurPct: Int, glass: Boolean, modifier: Mo
                     }
                     .then(if (blurred) Modifier.blur((blurPct * 0.32f).dp, BlurredEdgeTreatment.Unbounded) else Modifier),
             )
-            Box(Modifier.fillMaxSize().background(scheme.background.copy(alpha = if (glass) 0.25f else 0.50f)))
+            Box(Modifier.fillMaxSize().background(scheme.background.copy(alpha = if (dense) 0.55f else if (glass) 0.25f else 0.50f)))
         } else {
             val base = if (glass) {
                 Brush.verticalGradient(

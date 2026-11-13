@@ -251,11 +251,14 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
     }
 
     val glassHome = vp.homeStyle == HomeStyle.Glass && st.path == null && !searching
-    val showBackdrop = st.path == null && !searching && (homeBg != null || glassHome || vp.bgBlur > 0)
+    val inFolders = st.path != null || searching
+    val hasBackdrop = homeBg != null || vp.homeStyle == HomeStyle.Glass || vp.bgBlur > 0
+    // Only on the home screen, unless the user also wants it behind storage and folders.
+    val showBackdrop = hasBackdrop && (vp.bgEverywhere || !inFolders)
     // The backdrop fades in and out over a plain background, so entering or leaving a folder never flashes.
     val backdropAlpha by animateFloatAsState(if (showBackdrop) 1f else 0f, tween(250), label = "backdrop")
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-    if (backdropAlpha > 0f) HomeBackdrop(homeBg, vp.bgBlur, glassHome, Modifier.alpha(backdropAlpha))
+    if (backdropAlpha > 0f) HomeBackdrop(homeBg, vp.bgBlur, vp.homeStyle == HomeStyle.Glass, Modifier.alpha(backdropAlpha), dense = inFolders)
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
