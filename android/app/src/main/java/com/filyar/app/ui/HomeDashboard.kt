@@ -49,6 +49,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
@@ -663,44 +667,59 @@ private fun isDarkSurface(): Boolean = MaterialTheme.colorScheme.background.lumi
 private fun glassTitleColor(): Color = if (LocalGlass.current && isDarkSurface()) Color(0xFFF1F3F6) else Color.Unspecified
 
 @Composable
-private fun glassSubColor(): Color = if (LocalGlass.current && isDarkSurface()) Color(0xFF9BA3B2) else MaterialTheme.colorScheme.onSurfaceVariant
+private fun glassSubColor(): Color = if (LocalGlass.current && isDarkSurface()) Color(0xFFA7AEBB) else MaterialTheme.colorScheme.onSurfaceVariant
 
 @Composable
 private fun glassIconTint(tint: Color): Color = if (LocalGlass.current && isDarkSurface()) lerp(tint, Color.White, 0.22f) else tint
 
-/** Frosted, translucent card: soft fill, bright rim light, darker lower edge and a hand-drawn soft shadow. */
+/** Frosted, translucent card: soft fill, bright rim light and a soft shadow that sits only outside the card. */
 @Composable
 private fun Modifier.glassCard(radius: Dp = 20.dp, elevated: Boolean = false): Modifier {
     val dark = isDarkSurface()
-    val shape = RoundedCornerShape(radius)
+    // Dark cards are a little rounder than the light ones.
+    val corner = if (dark) radius + 4.dp else radius
+    val shape = RoundedCornerShape(corner)
     val fill = if (dark) {
         if (elevated) {
-            Brush.verticalGradient(listOf(Color(0xFF2A2D37).copy(alpha = 0.94f), Color(0xFF22252D).copy(alpha = 0.94f)))
+            Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.15f), Color.White.copy(alpha = 0.07f)))
         } else {
-            Brush.verticalGradient(listOf(Color(0xFF212430).copy(alpha = 0.92f), Color(0xFF1A1D24).copy(alpha = 0.92f)))
+            Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.11f), Color.White.copy(alpha = 0.045f)))
         }
     } else {
         Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.46f), Color.White.copy(alpha = 0.18f)))
     }
     val rim = if (dark) {
-        Brush.linearGradient(listOf(Color.White.copy(alpha = 0.14f), Color.White.copy(alpha = 0.03f)))
+        Brush.linearGradient(listOf(Color.White.copy(alpha = 0.32f), Color.White.copy(alpha = 0.05f)))
     } else {
         Brush.linearGradient(listOf(Color.White, Color(0xFFB8C0CC).copy(alpha = 0.55f)))
     }
     val shadowColor = if (dark) Color.Black else Color(0xFF50607A)
     return this
         .drawBehind {
-            val r = radius.toPx()
-            val dy = (if (dark) 6.dp else 3.dp).toPx()
-            val layers = if (dark) listOf(14.dp to 0.06f, 8.dp to 0.10f, 3.dp to 0.16f) else listOf(7.dp to 0.012f, 4.dp to 0.018f, 2.dp to 0.026f)
-            layers.forEach { (grow, alpha) ->
-                val g = grow.toPx()
-                drawRoundRect(
-                    color = shadowColor.copy(alpha = alpha),
-                    topLeft = Offset(-g, -g + dy),
-                    size = Size(size.width + 2 * g, size.height + 2 * g),
-                    cornerRadius = CornerRadius(r + g),
-                )
+            val r = corner.toPx()
+            val dy = (if (dark) 8.dp else 3.dp).toPx()
+            val layers = if (dark) {
+                listOf(16.dp to 0.07f, 9.dp to 0.11f, 4.dp to 0.16f)
+            } else {
+                listOf(7.dp to 0.012f, 4.dp to 0.018f, 2.dp to 0.026f)
+            }
+            fun paintShadow() {
+                layers.forEach { (grow, alpha) ->
+                    val g = grow.toPx()
+                    drawRoundRect(
+                        color = shadowColor.copy(alpha = alpha),
+                        topLeft = Offset(-g, -g + dy),
+                        size = Size(size.width + 2 * g, size.height + 2 * g),
+                        cornerRadius = CornerRadius(r + g),
+                    )
+                }
+            }
+            if (dark) {
+                // The card is see-through, so keep the shadow out from under it.
+                val hole = Path().apply { addRoundRect(RoundRect(0f, 0f, size.width, size.height, CornerRadius(r))) }
+                clipPath(hole, clipOp = ClipOp.Difference) { paintShadow() }
+            } else {
+                paintShadow()
             }
         }
         .clip(shape)
