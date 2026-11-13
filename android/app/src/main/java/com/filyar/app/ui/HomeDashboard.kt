@@ -680,9 +680,9 @@ private fun Modifier.glassCard(radius: Dp = 20.dp, elevated: Boolean = false): M
     val shape = RoundedCornerShape(corner)
     val fill = if (dark) {
         if (elevated) {
-            Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.15f), Color.White.copy(alpha = 0.07f)))
+            Brush.verticalGradient(0f to Color.White.copy(alpha = 0.14f), 0.5f to Color.White.copy(alpha = 0.065f), 1f to Color.White.copy(alpha = 0.05f))
         } else {
-            Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.11f), Color.White.copy(alpha = 0.045f)))
+            Brush.verticalGradient(0f to Color.White.copy(alpha = 0.10f), 0.5f to Color.White.copy(alpha = 0.045f), 1f to Color.White.copy(alpha = 0.035f))
         }
     } else {
         Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.46f), Color.White.copy(alpha = 0.18f)))
