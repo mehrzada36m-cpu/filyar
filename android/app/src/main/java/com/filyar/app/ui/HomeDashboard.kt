@@ -688,7 +688,7 @@ private fun Modifier.glassCard(radius: Dp = 20.dp, elevated: Boolean = false): M
         Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.46f), Color.White.copy(alpha = 0.18f)))
     }
     val rim = if (dark) {
-        Brush.linearGradient(listOf(Color.White.copy(alpha = 0.224f), Color.White.copy(alpha = 0.035f)))
+        Brush.linearGradient(listOf(Color.White.copy(alpha = 0.157f), Color.White.copy(alpha = 0.0245f)))
     } else {
         Brush.linearGradient(listOf(Color.White, Color(0xFFB8C0CC).copy(alpha = 0.55f)))
     }
@@ -696,9 +696,9 @@ private fun Modifier.glassCard(radius: Dp = 20.dp, elevated: Boolean = false): M
     return this
         .drawBehind {
             val r = corner.toPx()
-            val dy = (if (dark) 2.8.dp else 3.dp).toPx()
+            val dy = (if (dark) 2.24.dp else 3.dp).toPx()
             val layers = if (dark) {
-                listOf(5.6.dp to 0.07f, 3.15.dp to 0.11f, 1.4.dp to 0.16f)
+                listOf(4.48.dp to 0.07f, 2.52.dp to 0.11f, 1.12.dp to 0.16f)
             } else {
                 listOf(7.dp to 0.012f, 4.dp to 0.018f, 2.dp to 0.026f)
             }
