@@ -49,6 +49,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.CompositionLocalProvider
@@ -497,11 +498,11 @@ private fun QuickTile(
             }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.titleSmall.copy(fontSize = 13.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(label, style = MaterialTheme.typography.titleSmall.copy(fontSize = 13.sp), color = glassTitleColor(), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     sub,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = glassSubColor(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -616,7 +617,7 @@ private fun QuickRecentTile(modifier: Modifier, onClick: () -> Unit) {
     ) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (glass) {
-                GlassBubble(blue, 46.dp * scale) { Icon(Icons.Filled.History, null, tint = blue) }
+                GlassBubble(blue, 46.dp * scale) { Icon(Icons.Filled.History, null, tint = glassIconTint(blue)) }
             } else {
                 Box(
                     Modifier.size(40.dp * scale).clip(CircleShape).background(blue.copy(alpha = 0.16f)),
@@ -625,11 +626,11 @@ private fun QuickRecentTile(modifier: Modifier, onClick: () -> Unit) {
             }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text("فایل‌های اخیر", style = MaterialTheme.typography.titleSmall.copy(fontSize = 13.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("فایل‌های اخیر", style = MaterialTheme.typography.titleSmall.copy(fontSize = 13.sp), color = glassTitleColor(), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     "تازه‌ترین فایل‌ها",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = glassSubColor(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -646,7 +647,7 @@ private fun ClassicSection(title: String, trailing: (@Composable () -> Unit)? = 
             .padding(start = 20.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = MaterialTheme.typography.titleSmall, color = if (LocalGlass.current && isDarkSurface()) Color(0xFF8AD8FF) else MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+        Text(title, style = MaterialTheme.typography.titleSmall, color = if (LocalGlass.current && isDarkSurface()) Color(0xFF8CC8FF) else MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
         trailing?.invoke()
     }
 }
@@ -657,18 +658,32 @@ private val LocalGlass = compositionLocalOf { false }
 @Composable
 private fun isDarkSurface(): Boolean = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
+// Dark glass palette: primary text #F2F5FF, secondary text #A9B4D0, icons lifted toward white.
+@Composable
+private fun glassTitleColor(): Color = if (LocalGlass.current && isDarkSurface()) Color(0xFFF2F5FF) else Color.Unspecified
+
+@Composable
+private fun glassSubColor(): Color = if (LocalGlass.current && isDarkSurface()) Color(0xFFA9B4D0) else MaterialTheme.colorScheme.onSurfaceVariant
+
+@Composable
+private fun glassIconTint(tint: Color): Color = if (LocalGlass.current && isDarkSurface()) lerp(tint, Color.White, 0.55f) else tint
+
 /** Frosted, translucent card: soft fill, bright rim light, darker lower edge and a hand-drawn soft shadow. */
 @Composable
-private fun Modifier.glassCard(radius: Dp = 20.dp): Modifier {
+private fun Modifier.glassCard(radius: Dp = 20.dp, elevated: Boolean = false): Modifier {
     val dark = isDarkSurface()
     val shape = RoundedCornerShape(radius)
     val fill = if (dark) {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.17f), Color.White.copy(alpha = 0.04f)))
+        if (elevated) {
+            Brush.verticalGradient(listOf(Color(0xFF2A3560).copy(alpha = 0.78f), Color(0xFF1B2342).copy(alpha = 0.70f)))
+        } else {
+            Brush.verticalGradient(listOf(Color(0xFF222B4F).copy(alpha = 0.66f), Color(0xFF161D38).copy(alpha = 0.58f)))
+        }
     } else {
         Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.46f), Color.White.copy(alpha = 0.18f)))
     }
     val rim = if (dark) {
-        Brush.linearGradient(listOf(Color.White.copy(alpha = 0.60f), Color.White.copy(alpha = 0.06f)))
+        Brush.linearGradient(listOf(Color.White.copy(alpha = 0.30f), Color.White.copy(alpha = 0.05f)))
     } else {
         Brush.linearGradient(listOf(Color.White, Color(0xFFB8C0CC).copy(alpha = 0.55f)))
     }
@@ -676,8 +691,8 @@ private fun Modifier.glassCard(radius: Dp = 20.dp): Modifier {
     return this
         .drawBehind {
             val r = radius.toPx()
-            val dy = 3.dp.toPx()
-            val layers = if (dark) listOf(8.dp to 0.10f, 4.dp to 0.16f, 2.dp to 0.24f) else listOf(7.dp to 0.012f, 4.dp to 0.018f, 2.dp to 0.026f)
+            val dy = (if (dark) 4.dp else 3.dp).toPx()
+            val layers = if (dark) listOf(10.dp to 0.05f, 5.dp to 0.08f, 2.dp to 0.12f) else listOf(7.dp to 0.012f, 4.dp to 0.018f, 2.dp to 0.026f)
             layers.forEach { (grow, alpha) ->
                 val g = grow.toPx()
                 drawRoundRect(
@@ -701,7 +716,7 @@ private fun GlassBubble(tint: Color, size: Dp = 52.dp, content: @Composable () -
         Modifier
             .size(size)
             .drawBehind {
-                (if (dark) listOf(7.dp to 0.20f, 3.dp to 0.30f) else listOf(6.dp to 0.06f, 3.dp to 0.09f)).forEach { (grow, alpha) ->
+                (if (dark) listOf(7.dp to 0.10f, 3.dp to 0.16f) else listOf(6.dp to 0.06f, 3.dp to 0.09f)).forEach { (grow, alpha) ->
                     drawCircle(
                         color = tint.copy(alpha = alpha),
                         radius = this.size.minDimension / 2 + grow.toPx(),
@@ -712,12 +727,12 @@ private fun GlassBubble(tint: Color, size: Dp = 52.dp, content: @Composable () -
             .clip(CircleShape)
             .background(
                 Brush.linearGradient(
-                    listOf(Color.White.copy(alpha = if (dark) 0.42f else 0.95f), tint.copy(alpha = if (dark) 0.50f else 0.26f)),
+                    if (dark) listOf(lerp(tint, Color.White, 0.20f).copy(alpha = 0.60f), tint.copy(alpha = 0.26f)) else listOf(Color.White.copy(alpha = 0.95f), tint.copy(alpha = 0.26f)),
                 ),
             )
             .border(
                 1.dp,
-                Brush.linearGradient(listOf(Color.White.copy(alpha = if (dark) 0.65f else 1f), tint.copy(alpha = if (dark) 0.25f else 0.18f))),
+                Brush.linearGradient(listOf(Color.White.copy(alpha = if (dark) 0.55f else 1f), tint.copy(alpha = if (dark) 0.30f else 0.18f))),
                 CircleShape,
             ),
         contentAlignment = Alignment.Center,
@@ -734,18 +749,19 @@ private fun ClassicTile(
     small: Boolean = false,
     vPad: Dp = 10.dp,
     iconSize: Dp? = null,
+    elevated: Boolean = false,
     onClick: () -> Unit,
 ) {
     val glass = LocalGlass.current
     Row(
         modifier
-            .then(if (glass) Modifier.padding(5.dp).glassCard() else Modifier.clip(RoundedCornerShape(16.dp)))
+            .then(if (glass) Modifier.padding(5.dp).glassCard(elevated = elevated) else Modifier.clip(RoundedCornerShape(16.dp)))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = vPad),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (glass) {
-            GlassBubble(tint, iconSize ?: 52.dp) { Icon(icon, null, tint = tint) }
+            GlassBubble(tint, iconSize ?: 52.dp) { Icon(icon, null, tint = glassIconTint(tint)) }
         } else {
             Box(
                 Modifier
@@ -757,12 +773,12 @@ private fun ClassicTile(
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, style = if (small) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, style = if (small) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium, color = glassTitleColor(), maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (subtitle != null) {
                 Text(
                     subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = glassSubColor(),
                     maxLines = if (small) 2 else 3,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -812,14 +828,14 @@ private fun ClassicHome(
             ClassicTile(
                 Icons.Filled.PhoneAndroid, blue, "حافظه داخلی",
                 (if (total > 0) "${formatSize(total)} • ${formatSize(free)} خالی\n" else "") + rootPath,
-                Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 8.dp), elevated = true,
             ) { onOpen(rootPath) }
         }
         item(key = "data") {
             ClassicTile(
                 Icons.Filled.FolderSpecial, amber, "Android/data",
                 "دیتای برنامه‌ها و بازی‌ها",
-                Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 8.dp), elevated = true,
             ) { onOpen("$rootPath/Android/data") }
         }
 

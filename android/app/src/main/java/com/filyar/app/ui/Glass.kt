@@ -101,7 +101,7 @@ fun HomeBackdrop(image: ImageBitmap?, blurPct: Int, glass: Boolean, modifier: Mo
         } else {
             val base = if (glass) {
                 Brush.verticalGradient(
-                    if (dark) listOf(Color(0xFF151B33), Color(0xFF0A0E1C)) else listOf(Color(0xFFF8FAFC), Color(0xFFE3E7ED)),
+                    if (dark) listOf(Color(0xFF131A33), Color(0xFF0B1020)) else listOf(Color(0xFFF8FAFC), Color(0xFFE3E7ED)),
                 )
             } else {
                 Brush.verticalGradient(listOf(scheme.background, scheme.background))
@@ -109,7 +109,7 @@ fun HomeBackdrop(image: ImageBitmap?, blurPct: Int, glass: Boolean, modifier: Mo
             Box(Modifier.fillMaxSize().background(base))
             // Soft colour glows drawn as radial gradients (no blur layer, so no seams); the slider widens them.
             Canvas(Modifier.fillMaxSize()) {
-                val a = if (dark) 0.42f else 0.30f
+                val a = if (dark) 0.22f else 0.30f
                 val m = this.size.minDimension
                 val k = 0.40f + 0.35f * blurPct / 100f
                 // The glow fades to the same colour at zero opacity, and is painted over the whole canvas,
@@ -125,9 +125,9 @@ fun HomeBackdrop(image: ImageBitmap?, blurPct: Int, glass: Boolean, modifier: Mo
                     )
                 }
                 // Dark mode uses fixed vivid colours: the dark theme's own colours are too dull to light up the glass.
-                glow(if (dark) Color(0xFF5B6CFF) else scheme.primary, 0.85f, 0.12f, 0.45f)
-                glow(if (dark) Color(0xFF14C8C0) else scheme.tertiary, 0.10f, 0.45f, 0.40f)
-                glow(if (dark) Color(0xFFD14BC8) else scheme.secondary, 0.80f, 0.88f, 0.42f)
+                glow(if (dark) Color(0xFF4F5BFF) else scheme.primary, 0.85f, 0.12f, 0.45f)
+                glow(if (dark) Color(0xFF12B5B0) else scheme.tertiary, 0.10f, 0.45f, 0.40f)
+                glow(if (dark) Color(0xFF9B5CFF) else scheme.secondary, 0.80f, 0.88f, 0.42f)
             }
         }
     }
