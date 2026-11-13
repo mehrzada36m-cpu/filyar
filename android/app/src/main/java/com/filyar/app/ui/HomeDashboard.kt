@@ -651,7 +651,7 @@ private fun ClassicSection(title: String, trailing: (@Composable () -> Unit)? = 
             .padding(start = 20.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = MaterialTheme.typography.titleSmall, color = if (LocalGlass.current && isDarkSurface()) Color(0xFFC5CDD8) else MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+        Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
         trailing?.invoke()
     }
 }
@@ -676,8 +676,7 @@ private fun glassIconTint(tint: Color): Color = if (LocalGlass.current && isDark
 @Composable
 private fun Modifier.glassCard(radius: Dp = 20.dp, elevated: Boolean = false): Modifier {
     val dark = isDarkSurface()
-    // Dark cards are a little rounder than the light ones.
-    val corner = if (dark) radius + 4.dp else radius
+    val corner = radius
     val shape = RoundedCornerShape(corner)
     val fill = if (dark) {
         if (elevated) {
@@ -689,7 +688,7 @@ private fun Modifier.glassCard(radius: Dp = 20.dp, elevated: Boolean = false): M
         Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.46f), Color.White.copy(alpha = 0.18f)))
     }
     val rim = if (dark) {
-        Brush.linearGradient(listOf(Color.White.copy(alpha = 0.32f), Color.White.copy(alpha = 0.05f)))
+        Brush.linearGradient(listOf(Color.White.copy(alpha = 0.224f), Color.White.copy(alpha = 0.035f)))
     } else {
         Brush.linearGradient(listOf(Color.White, Color(0xFFB8C0CC).copy(alpha = 0.55f)))
     }
@@ -697,9 +696,9 @@ private fun Modifier.glassCard(radius: Dp = 20.dp, elevated: Boolean = false): M
     return this
         .drawBehind {
             val r = corner.toPx()
-            val dy = (if (dark) 8.dp else 3.dp).toPx()
+            val dy = (if (dark) 4.dp else 3.dp).toPx()
             val layers = if (dark) {
-                listOf(16.dp to 0.07f, 9.dp to 0.11f, 4.dp to 0.16f)
+                listOf(8.dp to 0.07f, 4.5.dp to 0.11f, 2.dp to 0.16f)
             } else {
                 listOf(7.dp to 0.012f, 4.dp to 0.018f, 2.dp to 0.026f)
             }
