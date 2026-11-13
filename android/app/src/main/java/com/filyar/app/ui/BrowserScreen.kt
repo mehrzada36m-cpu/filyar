@@ -113,6 +113,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.height
+import androidx.compose.animation.animateContentSize
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.window.PopupProperties
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.Popup
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.draw.shadow
@@ -264,6 +274,7 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
     if (backdropAlpha > 0f) HomeBackdrop(homeBg, vp.bgBlur, vp.homeStyle == HomeStyle.Glass, Modifier.alpha(backdropAlpha), dense = inFolders)
     Scaffold(
         containerColor = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onBackground,
         topBar = {
             when {
                 selecting -> SelectionTopBar(st.selection.size, onClose = vm::clearSelection, onSelectAll = vm::selectAll)
@@ -303,7 +314,24 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
                     onCut = { vm.setClip(vm.selectedItems(), cut = true) },
                     onShare = { vm.share(vm.selectedItems()) },
                     onDelete = { dlg = Dlg.Delete(vm.selectedItems()) },
-                    onMore = { dlg = Dlg.SelectionMore },
+                    extra = buildList {
+                        val picked = vm.selectedItems()
+                        val one = picked.singleOrNull()
+                        if (one != null) add(MoreItem(Icons.Filled.DriveFileRenameOutline, "تغییر نام") { dlg = Dlg.Rename(one) })
+                        if (one != null && one.isDirectory) add(MoreItem(Icons.Filled.Palette, "تغییر آیکون پوشه") { dlg = Dlg.FolderStyleDlg(one) })
+                        add(MoreItem(Icons.Filled.FolderZip, "فشرده‌سازی (ZIP)") { dlg = Dlg.Compress(picked) })
+                        if (one != null && one.isDirectory) {
+                            val saved = one.path in quickAccess
+                            add(
+                                MoreItem(
+                                    if (saved) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
+                                    if (saved) "حذف از دسترسی سریع" else "افزودن به دسترسی سریع",
+                                ) { vm.toggleQuickAccess(one.path) },
+                            )
+                        }
+                        if (one != null) add(MoreItem(Icons.Filled.Info, "مشخصات") { dlg = Dlg.Props(one) })
+                        add(MoreItem(Icons.Filled.SelectAll, "انتخاب همه") { vm.selectAll() })
+                    },
                 )
                 clip != null && st.path != null && !searching -> PasteBar(
                     count = clip!!.items.size,
@@ -741,31 +769,72 @@ private fun SearchTopBar(query: String, path: String?, rootPath: String, onQuery
     )
 }
 
+private class MoreItem(val icon: androidx.compose.ui.graphics.vector.ImageVector, val label: String, val onClick: () -> Unit)
+
 @Composable
-private fun SelectionBottomBar(onCopy: () -> Unit, onCut: () -> Unit, onShare: () -> Unit, onDelete: () -> Unit, onMore: () -> Unit) {
+private fun SelectionBottomBar(
+    onCopy: () -> Unit,
+    onCut: () -> Unit,
+    onShare: () -> Unit,
+    onDelete: () -> Unit,
+    extra: List<MoreItem>,
+) {
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < 0.5f
-    val shape = RoundedCornerShape(50)
+    val shape = RoundedCornerShape(28.dp)
+    var moreOpen by remember { mutableStateOf(false) }
     val rim = Brush.linearGradient(
         listOf(Color.White.copy(alpha = if (dark) 0.30f else 1f), Color.White.copy(alpha = if (dark) 0.06f else 0.35f)),
     )
-    // A narrow floating capsule with icon-only actions.
-    Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 12.dp), contentAlignment = Alignment.Center) {
-        Row(
+    val fill = Brush.verticalGradient(listOf(scheme.surfaceContainerHigh.copy(alpha = 0.92f), scheme.surfaceContainer.copy(alpha = 0.80f)))
+    // One frosted container: a narrow icon capsule that slides open upwards into a list when the three dots are tapped.
+    Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 30.dp), contentAlignment = Alignment.BottomCenter) {
+        Column(
             Modifier
+                .animateContentSize()
+                .then(if (moreOpen) Modifier.width(280.dp) else Modifier)
                 .shadow(8.dp, shape, ambientColor = Color.Black.copy(alpha = 0.25f), spotColor = Color.Black.copy(alpha = 0.25f))
                 .clip(shape)
-                .background(Brush.verticalGradient(listOf(scheme.surfaceContainerHigh.copy(alpha = 0.92f), scheme.surfaceContainer.copy(alpha = 0.80f))))
-                .border(1.dp, rim, shape)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .background(fill)
+                .border(1.dp, rim, shape),
         ) {
-            CapsuleAction(Icons.Filled.ContentCopy, "کپی", onCopy)
-            CapsuleAction(Icons.Filled.ContentCut, "انتقال", onCut)
-            CapsuleAction(Icons.Filled.Delete, "حذف", onDelete, tint = scheme.error)
-            CapsuleAction(Icons.Filled.Share, "ارسال", onShare)
-            CapsuleAction(Icons.Filled.MoreVert, "بیشتر", onMore)
+            if (moreOpen) {
+                Column(Modifier.padding(top = 8.dp)) {
+                    extra.forEach { item ->
+                        Surface(
+                            onClick = {
+                                moreOpen = false
+                                item.onClick()
+                            },
+                            color = Color.Transparent,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(
+                                Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(item.icon, null, tint = scheme.onSurface, modifier = Modifier.size(22.dp))
+                                Spacer(Modifier.width(16.dp))
+                                Text(item.label, style = MaterialTheme.typography.bodyLarge, color = scheme.onSurface, maxLines = 1)
+                            }
+                        }
+                    }
+                }
+                Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp).height(1.dp).background(scheme.outlineVariant))
+            }
+            Row(
+                Modifier
+                    .then(if (moreOpen) Modifier.fillMaxWidth() else Modifier)
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = if (moreOpen) Arrangement.SpaceEvenly else Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CapsuleAction(Icons.Filled.ContentCopy, "کپی", onCopy)
+                CapsuleAction(Icons.Filled.ContentCut, "انتقال", onCut)
+                CapsuleAction(Icons.Filled.Delete, "حذف", onDelete, tint = scheme.error)
+                CapsuleAction(Icons.Filled.Share, "ارسال", onShare)
+                CapsuleAction(Icons.Filled.MoreVert, "بیشتر", { moreOpen = !moreOpen })
+            }
         }
     }
 }
@@ -773,7 +842,7 @@ private fun SelectionBottomBar(onCopy: () -> Unit, onCut: () -> Unit, onShare: (
 @Composable
 private fun CapsuleAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit, tint: Color = Color.Unspecified) {
     IconButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
-        Icon(icon, label, tint = tint, modifier = Modifier.size(22.dp))
+        Icon(icon, label, tint = if (tint != Color.Unspecified) tint else MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(22.dp))
     }
 }
 
