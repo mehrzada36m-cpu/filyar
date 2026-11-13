@@ -48,6 +48,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import com.filyar.app.ui.PlayerScreen
 import com.filyar.app.ui.ZipPreviewDialog
 import com.filyar.app.ui.UiEvent
