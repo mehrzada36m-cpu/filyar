@@ -101,7 +101,7 @@ fun HomeBackdrop(image: ImageBitmap?, blurPct: Int, glass: Boolean, modifier: Mo
         } else {
             val base = if (glass) {
                 Brush.verticalGradient(
-                    if (dark) listOf(Color(0xFF1B1A1E), Color(0xFF101012)) else listOf(Color(0xFFF8FAFC), Color(0xFFE3E7ED)),
+                    if (dark) listOf(Color(0xFF050505), Color(0xFF000000)) else listOf(Color(0xFFF8FAFC), Color(0xFFE3E7ED)),
                 )
             } else {
                 Brush.verticalGradient(listOf(scheme.background, scheme.background))
@@ -109,7 +109,7 @@ fun HomeBackdrop(image: ImageBitmap?, blurPct: Int, glass: Boolean, modifier: Mo
             Box(Modifier.fillMaxSize().background(base))
             // Soft colour glows drawn as radial gradients (no blur layer, so no seams); the slider widens them.
             Canvas(Modifier.fillMaxSize()) {
-                val a = if (dark) 0.34f else 0.30f
+                val a = if (dark) 0.45f else 0.30f
                 val m = this.size.minDimension
                 val k = (0.40f + 0.35f * blurPct / 100f) * (if (dark) 1.25f else 1f)
                 // The glow fades to the same colour at zero opacity, and is painted over the whole canvas,
@@ -125,9 +125,9 @@ fun HomeBackdrop(image: ImageBitmap?, blurPct: Int, glass: Boolean, modifier: Mo
                     )
                 }
                 // Dark mode uses fixed vivid colours: the dark theme's own colours are too dull to light up the glass.
-                glow(if (dark) Color(0xFF9A7650) else scheme.primary, 0.85f, 0.12f, 0.45f)
-                glow(if (dark) Color(0xFF8F5A6C) else scheme.tertiary, 0.10f, 0.45f, 0.40f)
-                glow(if (dark) Color(0xFF4E7B76) else scheme.secondary, 0.80f, 0.88f, 0.42f)
+                glow(if (dark) Color(0xFFA67C52) else scheme.primary, 0.85f, 0.12f, 0.45f)
+                glow(if (dark) Color(0xFF9B5F78) else scheme.tertiary, 0.10f, 0.45f, 0.40f)
+                glow(if (dark) Color(0xFF4F8A82) else scheme.secondary, 0.80f, 0.88f, 0.42f)
             }
         }
     }

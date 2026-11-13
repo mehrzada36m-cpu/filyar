@@ -696,9 +696,9 @@ private fun Modifier.glassCard(radius: Dp = 20.dp, elevated: Boolean = false): M
     return this
         .drawBehind {
             val r = corner.toPx()
-            val dy = (if (dark) 4.dp else 3.dp).toPx()
+            val dy = (if (dark) 2.8.dp else 3.dp).toPx()
             val layers = if (dark) {
-                listOf(8.dp to 0.07f, 4.5.dp to 0.11f, 2.dp to 0.16f)
+                listOf(5.6.dp to 0.07f, 3.15.dp to 0.11f, 1.4.dp to 0.16f)
             } else {
                 listOf(7.dp to 0.012f, 4.dp to 0.018f, 2.dp to 0.026f)
             }
