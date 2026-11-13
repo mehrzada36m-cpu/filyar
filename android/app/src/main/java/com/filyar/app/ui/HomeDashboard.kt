@@ -647,7 +647,7 @@ private fun ClassicSection(title: String, trailing: (@Composable () -> Unit)? = 
             .padding(start = 20.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = MaterialTheme.typography.titleSmall, color = if (LocalGlass.current && isDarkSurface()) Color(0xFF8CC8FF) else MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+        Text(title, style = MaterialTheme.typography.titleSmall, color = if (LocalGlass.current && isDarkSurface()) Color(0xFFC5CDD8) else MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
         trailing?.invoke()
     }
 }
@@ -660,13 +660,13 @@ private fun isDarkSurface(): Boolean = MaterialTheme.colorScheme.background.lumi
 
 // Dark glass palette: primary text #F2F5FF, secondary text #A9B4D0, icons lifted toward white.
 @Composable
-private fun glassTitleColor(): Color = if (LocalGlass.current && isDarkSurface()) Color(0xFFF2F5FF) else Color.Unspecified
+private fun glassTitleColor(): Color = if (LocalGlass.current && isDarkSurface()) Color(0xFFF1F3F6) else Color.Unspecified
 
 @Composable
-private fun glassSubColor(): Color = if (LocalGlass.current && isDarkSurface()) Color(0xFFA9B4D0) else MaterialTheme.colorScheme.onSurfaceVariant
+private fun glassSubColor(): Color = if (LocalGlass.current && isDarkSurface()) Color(0xFF9BA3B2) else MaterialTheme.colorScheme.onSurfaceVariant
 
 @Composable
-private fun glassIconTint(tint: Color): Color = if (LocalGlass.current && isDarkSurface()) lerp(tint, Color.White, 0.55f) else tint
+private fun glassIconTint(tint: Color): Color = if (LocalGlass.current && isDarkSurface()) lerp(tint, Color.White, 0.22f) else tint
 
 /** Frosted, translucent card: soft fill, bright rim light, darker lower edge and a hand-drawn soft shadow. */
 @Composable
@@ -675,15 +675,15 @@ private fun Modifier.glassCard(radius: Dp = 20.dp, elevated: Boolean = false): M
     val shape = RoundedCornerShape(radius)
     val fill = if (dark) {
         if (elevated) {
-            Brush.verticalGradient(listOf(Color(0xFF2A3560).copy(alpha = 0.78f), Color(0xFF1B2342).copy(alpha = 0.70f)))
+            Brush.verticalGradient(listOf(Color(0xFF2A2D37).copy(alpha = 0.94f), Color(0xFF22252D).copy(alpha = 0.94f)))
         } else {
-            Brush.verticalGradient(listOf(Color(0xFF222B4F).copy(alpha = 0.66f), Color(0xFF161D38).copy(alpha = 0.58f)))
+            Brush.verticalGradient(listOf(Color(0xFF212430).copy(alpha = 0.92f), Color(0xFF1A1D24).copy(alpha = 0.92f)))
         }
     } else {
         Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.46f), Color.White.copy(alpha = 0.18f)))
     }
     val rim = if (dark) {
-        Brush.linearGradient(listOf(Color.White.copy(alpha = 0.30f), Color.White.copy(alpha = 0.05f)))
+        Brush.linearGradient(listOf(Color.White.copy(alpha = 0.14f), Color.White.copy(alpha = 0.03f)))
     } else {
         Brush.linearGradient(listOf(Color.White, Color(0xFFB8C0CC).copy(alpha = 0.55f)))
     }
@@ -691,8 +691,8 @@ private fun Modifier.glassCard(radius: Dp = 20.dp, elevated: Boolean = false): M
     return this
         .drawBehind {
             val r = radius.toPx()
-            val dy = (if (dark) 4.dp else 3.dp).toPx()
-            val layers = if (dark) listOf(10.dp to 0.05f, 5.dp to 0.08f, 2.dp to 0.12f) else listOf(7.dp to 0.012f, 4.dp to 0.018f, 2.dp to 0.026f)
+            val dy = (if (dark) 6.dp else 3.dp).toPx()
+            val layers = if (dark) listOf(14.dp to 0.06f, 8.dp to 0.10f, 3.dp to 0.16f) else listOf(7.dp to 0.012f, 4.dp to 0.018f, 2.dp to 0.026f)
             layers.forEach { (grow, alpha) ->
                 val g = grow.toPx()
                 drawRoundRect(
@@ -716,7 +716,7 @@ private fun GlassBubble(tint: Color, size: Dp = 52.dp, content: @Composable () -
         Modifier
             .size(size)
             .drawBehind {
-                (if (dark) listOf(7.dp to 0.10f, 3.dp to 0.16f) else listOf(6.dp to 0.06f, 3.dp to 0.09f)).forEach { (grow, alpha) ->
+                (if (dark) listOf(5.dp to 0.06f, 2.dp to 0.10f) else listOf(6.dp to 0.06f, 3.dp to 0.09f)).forEach { (grow, alpha) ->
                     drawCircle(
                         color = tint.copy(alpha = alpha),
                         radius = this.size.minDimension / 2 + grow.toPx(),
@@ -727,12 +727,12 @@ private fun GlassBubble(tint: Color, size: Dp = 52.dp, content: @Composable () -
             .clip(CircleShape)
             .background(
                 Brush.linearGradient(
-                    if (dark) listOf(lerp(tint, Color.White, 0.20f).copy(alpha = 0.60f), tint.copy(alpha = 0.26f)) else listOf(Color.White.copy(alpha = 0.95f), tint.copy(alpha = 0.26f)),
+                    if (dark) listOf(tint.copy(alpha = 0.28f), tint.copy(alpha = 0.12f)) else listOf(Color.White.copy(alpha = 0.95f), tint.copy(alpha = 0.26f)),
                 ),
             )
             .border(
                 1.dp,
-                Brush.linearGradient(listOf(Color.White.copy(alpha = if (dark) 0.55f else 1f), tint.copy(alpha = if (dark) 0.30f else 0.18f))),
+                Brush.linearGradient(listOf(Color.White.copy(alpha = if (dark) 0.22f else 1f), tint.copy(alpha = if (dark) 0.22f else 0.18f))),
                 CircleShape,
             ),
         contentAlignment = Alignment.Center,
