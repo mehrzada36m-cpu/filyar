@@ -115,6 +115,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.height
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.expandVertically
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.IntSize
@@ -799,14 +801,13 @@ private fun SelectionBottomBar(
     Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 30.dp), contentAlignment = Alignment.BottomCenter) {
         Column(
             Modifier
-                .softShadow(28.dp)
-                .animateContentSize()
                 .width(264.dp)
                 .clip(shape)
                 .background(fill)
                 .border(1.dp, rim, shape),
         ) {
-            if (moreOpen) {
+            AnimatedVisibility(visible = moreOpen, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+              Column {
                 Column(Modifier.padding(top = 8.dp)) {
                     extra.forEach { item ->
                         Surface(
@@ -829,6 +830,7 @@ private fun SelectionBottomBar(
                     }
                 }
                 Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp).height(1.dp).background(scheme.outlineVariant))
+              }
             }
             Row(
                 Modifier

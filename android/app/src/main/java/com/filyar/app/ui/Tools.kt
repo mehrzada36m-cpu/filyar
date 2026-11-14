@@ -1,6 +1,9 @@
 package com.filyar.app.ui
 
 import android.net.Uri
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.Path
@@ -274,6 +277,7 @@ class MiniAudio {
     var failed by mutableStateOf(false)
     var duration by mutableStateOf(0)
     var position by mutableStateOf(0)
+    var speed by mutableStateOf(1f)
     private var player: MediaPlayer? = null
 
     fun play(f: RemoteFile) {
@@ -293,6 +297,7 @@ class MiniAudio {
                 ready = true
                 it.start()
                 playing = true
+                if (speed != 1f) applySpeed()
             }
             mp.setOnCompletionListener {
                 playing = false
@@ -318,7 +323,23 @@ class MiniAudio {
         } else {
             mp.start()
             playing = true
+            if (speed != 1f) applySpeed()
         }
+    }
+
+    /** 1X, 1.5X and 2X, in turn. */
+    fun cycleSpeed() {
+        speed = when (speed) {
+            1f -> 1.5f
+            1.5f -> 2f
+            else -> 1f
+        }
+        if (playing) applySpeed()
+    }
+
+    private fun applySpeed() {
+        val mp = player ?: return
+        runCatching { mp.playbackParams = mp.playbackParams.setSpeed(speed) }
     }
 
     fun seekFraction(fraction: Float) {
@@ -346,8 +367,9 @@ class MiniAudio {
 }
 
 /**
- * Slim, frosted audio capsule. Every screen places it right under its header, so it pushes the content down
- * instead of covering cards or folders. The × stops the music.
+ * Mini player pill in the style of Telegram's: a white 40dp capsule with the play/pause button, the track name,
+ * a speed badge and a close button, and a thin blue progress line along its bottom edge. Every screen places it
+ * right under its header, so it pushes the content down instead of covering it.
  */
 @Composable
 fun MiniPlayerBar(audio: MiniAudio) {
@@ -363,76 +385,84 @@ fun MiniPlayerBar(audio: MiniAudio) {
 
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < 0.5f
-    val shape = RoundedCornerShape(26.dp)
-    val rim = Brush.linearGradient(
-        listOf(Color.White.copy(alpha = if (dark) 0.30f else 1f), Color.White.copy(alpha = if (dark) 0.06f else 0.35f)),
-    )
-    CompositionLocalProvider(LocalContentColor provides scheme.onSurface) {
-        Column(
+    val pill = RoundedCornerShape(50)
+    val blue = if (dark) Color(0xFF64B5F6) else Color(0xFF2A8BEA)
+    val fill = if (dark) scheme.surfaceContainerHigh else Color.White
+    val ink = if (dark) scheme.onSurface else Color(0xFF111111)
+    val gray = if (dark) scheme.onSurfaceVariant else Color(0xFF7B838C)
+    val edge = if (dark) Color.White.copy(alpha = 0.10f) else Color(0xFFE2E5E9)
+    val shown = (if (dragging) dragValue else if (audio.duration > 0) audio.position.toFloat() / audio.duration else 0f).coerceIn(0f, 1f)
+    val speedLabel = when (audio.speed) {
+        1f -> "1X"
+        1.5f -> "1.5X"
+        else -> "2X"
+    }
+    // Telegram lays this pill out left to right, whatever the app's language.
+    CompositionLocalProvider(LocalContentColor provides ink, LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Box(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 6.dp)
-                .clip(shape)
-                .background(Brush.verticalGradient(listOf(scheme.surfaceContainerHigh.copy(alpha = 0.92f), scheme.surfaceContainer.copy(alpha = 0.80f))))
-                .border(1.dp, rim, shape)
-                .padding(start = 10.dp, end = 4.dp, top = 4.dp, bottom = 2.dp),
+                .padding(horizontal = 13.dp, vertical = 4.dp)
+                .height(40.dp)
+                .clip(pill)
+                .background(fill)
+                .border(1.dp, edge, pill),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(30.dp).clip(CircleShape).background(scheme.primary.copy(alpha = 0.16f)),
-                    contentAlignment = Alignment.Center,
-                ) { Icon(Icons.Filled.MusicNote, null, tint = scheme.primary, modifier = Modifier.size(18.dp)) }
-                Spacer(Modifier.width(10.dp))
+            Row(Modifier.fillMaxSize().padding(start = 6.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { audio.toggle() }, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        if (audio.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        if (audio.playing) "توقف" else "پخش",
+                        tint = blue,
+                        modifier = Modifier.size(26.dp),
+                    )
+                }
+                Spacer(Modifier.width(6.dp))
                 Text(
-                    f.name.substringBeforeLast('.'),
-                    style = MaterialTheme.typography.labelLarge,
+                    if (audio.failed) "پخش ممکن نشد" else f.name.substringBeforeLast('.'),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = ink,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    if (audio.failed) "پخش ممکن نشد" else clock(if (dragging) (dragValue * audio.duration).toInt() else audio.position),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = scheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
-                IconButton(onClick = { audio.toggle() }, modifier = Modifier.size(36.dp)) {
-                    Icon(if (audio.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (audio.playing) "توقف" else "پخش", modifier = Modifier.size(22.dp))
-                }
-                IconButton(onClick = { audio.close() }, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Filled.Close, "بستن پخش‌کننده", modifier = Modifier.size(20.dp))
-                }
-            }
-            // Thin seek line, left to right; tap or drag to jump.
-            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                val shown = (if (dragging) dragValue else if (audio.duration > 0) audio.position.toFloat() / audio.duration else 0f).coerceIn(0f, 1f)
                 Box(
                     Modifier
-                        .fillMaxWidth()
-                        .height(16.dp)
-                        .padding(horizontal = 6.dp)
-                        .pointerInput(audio.ready, audio.duration) {
-                            detectTapGestures { o -> audio.seekFraction(o.x / size.width) }
-                        }
-                        .pointerInput(audio.ready, audio.duration) {
-                            detectHorizontalDragGestures(
-                                onDragStart = { o ->
-                                    dragging = true
-                                    dragValue = (o.x / size.width).coerceIn(0f, 1f)
-                                },
-                                onDragEnd = {
-                                    audio.seekFraction(dragValue)
-                                    dragging = false
-                                },
-                                onDragCancel = { dragging = false },
-                            ) { change, _ -> dragValue = (change.position.x / size.width).coerceIn(0f, 1f) }
-                        },
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    Box(Modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(scheme.onSurface.copy(alpha = 0.15f)))
-                    Box(Modifier.fillMaxWidth(shown).height(3.dp).clip(CircleShape).background(scheme.primary))
+                        .clip(RoundedCornerShape(5.dp))
+                        .border(1.5.dp, gray, RoundedCornerShape(5.dp))
+                        .clickable { audio.cycleSpeed() }
+                        .padding(horizontal = 5.dp, vertical = 1.dp),
+                ) { Text(speedLabel, color = gray, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1) }
+                Spacer(Modifier.width(8.dp))
+                IconButton(onClick = { audio.close() }, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Filled.Close, "بستن پخش‌کننده", tint = ink.copy(alpha = 0.75f), modifier = Modifier.size(22.dp))
                 }
+            }
+            // Blue progress line along the bottom edge; tap or drag there to jump.
+            Box(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .height(10.dp)
+                    .padding(horizontal = 20.dp)
+                    .pointerInput(audio.ready, audio.duration) {
+                        detectTapGestures { o -> audio.seekFraction(o.x / size.width) }
+                    }
+                    .pointerInput(audio.ready, audio.duration) {
+                        detectHorizontalDragGestures(
+                            onDragStart = { o ->
+                                dragging = true
+                                dragValue = (o.x / size.width).coerceIn(0f, 1f)
+                            },
+                            onDragEnd = {
+                                audio.seekFraction(dragValue)
+                                dragging = false
+                            },
+                            onDragCancel = { dragging = false },
+                        ) { change, _ -> dragValue = (change.position.x / size.width).coerceIn(0f, 1f) }
+                    },
+            ) {
+                Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(shown).height(3.dp).clip(CircleShape).background(blue))
             }
         }
     }
