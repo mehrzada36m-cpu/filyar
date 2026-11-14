@@ -74,7 +74,7 @@ fun FileListScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                     }
                 },
             )
-                    MiniPlayerBar(vm.audio)
+                    MiniPlayerBar(vm)
         }
     },
     ) { pad ->

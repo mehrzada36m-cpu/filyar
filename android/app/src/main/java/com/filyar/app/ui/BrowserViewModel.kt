@@ -1385,11 +1385,14 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- built-in installer and ZIP preview ----------
     /** The mini audio player; it lives here so the music keeps playing while you move between screens. */
-    val audio = MiniAudio()
+    val audio = MiniAudio.get(getApplication<Application>())
 
-    override fun onCleared() {
-        audio.close()
-        super.onCleared()
+    /** Opens the music screen from the mini player, closing whatever is open on top of it first. */
+    fun openMusic() {
+        if (listing.value != null) closeListing()
+        if (clean.value.mode != null) closeClean()
+        if (appsOpen.value) closeApps()
+        if (media.value.kind != MediaKind.Audio) openMedia(MediaKind.Audio)
     }
 
     private val _apkPrompt = MutableStateFlow<RemoteFile?>(null)

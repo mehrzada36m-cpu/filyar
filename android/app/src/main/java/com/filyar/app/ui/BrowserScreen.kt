@@ -217,6 +217,7 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
                 Manifest.permission.READ_MEDIA_AUDIO,
                 Manifest.permission.READ_MEDIA_IMAGES,
                 Manifest.permission.READ_MEDIA_VIDEO,
+                Manifest.permission.POST_NOTIFICATIONS,
             )
             if (media.any { context.checkSelfPermission(it) != android.content.pm.PackageManager.PERMISSION_GRANTED }) {
                 permLauncher.launch(media)
@@ -309,7 +310,7 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
                     onShizuku = shizukuAction,
                 )
             }
-                    MiniPlayerBar(vm.audio)
+                    MiniPlayerBar(vm)
         }
     },
         bottomBar = {
@@ -323,13 +324,33 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
             }
         },
         floatingActionButton = {
+            var fabOpen by remember { mutableStateOf(false) }
             AnimatedVisibility(!selecting && !searching && st.path != null && clip == null, enter = scaleIn(), exit = scaleOut()) {
-                FloatingActionButton(
-                    onClick = { dlg = Dlg.CreateMenu },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    shape = RoundedCornerShape(20.dp),
-                ) { Icon(Icons.Filled.Add, "ساختن") }
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // The capsule slides open above the button, with just the two icons.
+                    AnimatedVisibility(
+                        visible = fabOpen,
+                        enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
+                        exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut(),
+                    ) {
+                        Column(Modifier.glassCapsule(RoundedCornerShape(28.dp)).padding(vertical = 4.dp)) {
+                            CapsuleAction(Icons.Filled.CreateNewFolder, "پوشه‌ی جدید", {
+                                fabOpen = false
+                                dlg = Dlg.NewFolder
+                            })
+                            CapsuleAction(Icons.AutoMirrored.Filled.NoteAdd, "فایل جدید", {
+                                fabOpen = false
+                                dlg = Dlg.NewFile
+                            })
+                        }
+                    }
+                    FloatingActionButton(
+                        onClick = { fabOpen = !fabOpen },
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        shape = RoundedCornerShape(20.dp),
+                    ) { Icon(if (fabOpen) Icons.Filled.Close else Icons.Filled.Add, "ساختن") }
+                }
             }
         },
         snackbarHost = { SnackbarHost(snackbar) },

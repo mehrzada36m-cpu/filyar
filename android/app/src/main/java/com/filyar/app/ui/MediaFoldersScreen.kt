@@ -118,7 +118,7 @@ fun MediaFoldersScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                     IconButton(onClick = vm::rescanMedia, enabled = !m.scanning) { Icon(Icons.Filled.Refresh, "اسکن دوباره") }
                 },
             )
-                    MiniPlayerBar(vm.audio)
+                    MiniPlayerBar(vm)
         }
     },
     ) { pad ->

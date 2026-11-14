@@ -119,7 +119,7 @@ fun EditorScreen(file: RemoteFile, vm: BrowserViewModel, snackbar: SnackbarHostS
                     IconButton(onClick = save, enabled = dirty && !saving) { Icon(Icons.Filled.Save, "ذخیره") }
                 },
             )
-                    MiniPlayerBar(vm.audio)
+                    MiniPlayerBar(vm, beforeOpen = onClose)
         }
     },
     ) { pad ->

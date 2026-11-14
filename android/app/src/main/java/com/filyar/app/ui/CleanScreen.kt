@@ -166,7 +166,7 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                     ) { Icon(Icons.Filled.Refresh, "اسکن دوباره") }
                 },
             )
-                    MiniPlayerBar(vm.audio)
+                    MiniPlayerBar(vm)
         }
     },
         bottomBar = {

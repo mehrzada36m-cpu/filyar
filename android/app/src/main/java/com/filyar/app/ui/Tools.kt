@@ -1,6 +1,10 @@
 package com.filyar.app.ui
 
 import android.net.Uri
+import com.filyar.app.PlaybackService
+import androidx.compose.ui.graphics.Shape
+import android.content.Intent
+import android.content.Context
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.clickable
@@ -269,8 +273,34 @@ fun Modifier.softShadow(radius: Dp): Modifier = this.drawBehind {
     }
 }
 
+/** The frosted look shared by the floating capsules: same colour, same transparency, same light rim. */
+@Composable
+fun Modifier.glassCapsule(shape: Shape): Modifier {
+    val scheme = MaterialTheme.colorScheme
+    val dark = scheme.background.luminance() < 0.5f
+    val rim = Brush.linearGradient(
+        listOf(Color.White.copy(alpha = if (dark) 0.30f else 1f), Color.White.copy(alpha = if (dark) 0.06f else 0.35f)),
+    )
+    return this
+        .clip(shape)
+        .background(Brush.verticalGradient(listOf(scheme.surfaceContainerHigh.copy(alpha = 0.92f), scheme.surfaceContainer.copy(alpha = 0.80f))))
+        .border(1.dp, rim, shape)
+}
+
 /** The audio that plays in the mini player. It lives in the ViewModel, so music keeps playing across screens. */
-class MiniAudio {
+class MiniAudio private constructor(private val app: Context) {
+    companion object {
+        @Volatile private var instance: MiniAudio? = null
+
+        /** One player for the whole app, so it keeps going when the screen is recreated. */
+        fun get(context: Context): MiniAudio =
+            instance ?: synchronized(this) { instance ?: MiniAudio(context.applicationContext).also { instance = it } }
+    }
+
+    /** Set by the playback service, so the notification follows every change. */
+    var listener: (() -> Unit)? = null
+    private fun changed() { listener?.invoke() }
+
     var file by mutableStateOf<RemoteFile?>(null)
     var ready by mutableStateOf(false)
     var playing by mutableStateOf(false)
@@ -298,20 +328,26 @@ class MiniAudio {
                 it.start()
                 playing = true
                 if (speed != 1f) applySpeed()
+                changed()
             }
             mp.setOnCompletionListener {
                 playing = false
                 position = duration
+                changed()
             }
             mp.setOnErrorListener { _, _, _ ->
                 failed = true
                 playing = false
+                changed()
                 true
             }
             mp.prepareAsync()
         } catch (e: Exception) {
             failed = true
         }
+        // The service shows the media card in the notifications.
+        runCatching { app.startForegroundService(Intent(app, PlaybackService::class.java)) }
+        changed()
     }
 
     fun toggle() {
@@ -325,6 +361,7 @@ class MiniAudio {
             playing = true
             if (speed != 1f) applySpeed()
         }
+        changed()
     }
 
     /** 1X, 1.5X and 2X, in turn. */
@@ -358,6 +395,7 @@ class MiniAudio {
     fun close() {
         release()
         file = null
+        changed()
     }
 
     private fun release() {
@@ -372,7 +410,8 @@ class MiniAudio {
  * right under its header, so it pushes the content down instead of covering it.
  */
 @Composable
-fun MiniPlayerBar(audio: MiniAudio) {
+fun MiniPlayerBar(vm: BrowserViewModel, beforeOpen: () -> Unit = {}) {
+    val audio = vm.audio
     val f = audio.file ?: return
     var dragging by remember { mutableStateOf(false) }
     var dragValue by remember { mutableStateOf(0f) }
@@ -387,10 +426,8 @@ fun MiniPlayerBar(audio: MiniAudio) {
     val dark = scheme.background.luminance() < 0.5f
     val pill = RoundedCornerShape(50)
     val blue = if (dark) Color(0xFF64B5F6) else Color(0xFF2A8BEA)
-    val fill = if (dark) scheme.surfaceContainerHigh else Color.White
-    val ink = if (dark) scheme.onSurface else Color(0xFF111111)
-    val gray = if (dark) scheme.onSurfaceVariant else Color(0xFF7B838C)
-    val edge = if (dark) Color.White.copy(alpha = 0.10f) else Color(0xFFE2E5E9)
+    val ink = scheme.onSurface
+    val gray = scheme.onSurfaceVariant
     val shown = (if (dragging) dragValue else if (audio.duration > 0) audio.position.toFloat() / audio.duration else 0f).coerceIn(0f, 1f)
     val speedLabel = when (audio.speed) {
         1f -> "1X"
@@ -404,9 +441,11 @@ fun MiniPlayerBar(audio: MiniAudio) {
                 .fillMaxWidth()
                 .padding(horizontal = 13.dp, vertical = 4.dp)
                 .height(40.dp)
-                .clip(pill)
-                .background(fill)
-                .border(1.dp, edge, pill),
+                .glassCapsule(pill)
+                .clickable {
+                    beforeOpen()
+                    vm.openMusic()
+                },
         ) {
             Row(Modifier.fillMaxSize().padding(start = 6.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { audio.toggle() }, modifier = Modifier.size(36.dp)) {

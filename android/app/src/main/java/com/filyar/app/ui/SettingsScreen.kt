@@ -84,7 +84,7 @@ fun SettingsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onBack: ()
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت") } },
                 title = { Text("تنظیمات", style = MaterialTheme.typography.titleLarge) },
             )
-                    MiniPlayerBar(vm.audio)
+                    MiniPlayerBar(vm, beforeOpen = onBack)
         }
     },
     ) { pad ->

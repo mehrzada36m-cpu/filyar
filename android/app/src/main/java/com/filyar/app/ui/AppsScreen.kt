@@ -104,7 +104,7 @@ fun AppsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                     IconButton(onClick = vm::loadApps) { Icon(Icons.Filled.Refresh, "تازه‌سازی") }
                 },
             )
-                    MiniPlayerBar(vm.audio)
+                    MiniPlayerBar(vm)
         }
     },
     ) { pad ->
