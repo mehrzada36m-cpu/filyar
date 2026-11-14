@@ -100,6 +100,7 @@ fun MediaFoldersScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
+        Column {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                 navigationIcon = { IconButton(onClick = vm::closeMedia) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت") } },
@@ -117,7 +118,9 @@ fun MediaFoldersScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                     IconButton(onClick = vm::rescanMedia, enabled = !m.scanning) { Icon(Icons.Filled.Refresh, "اسکن دوباره") }
                 },
             )
-        },
+                    MiniPlayerBar(vm.audio)
+        }
+    },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             if (m.scanning) LinearProgressIndicator(Modifier.fillMaxWidth())

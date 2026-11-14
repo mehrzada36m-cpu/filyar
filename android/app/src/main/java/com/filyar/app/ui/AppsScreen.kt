@@ -86,6 +86,7 @@ fun AppsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
+        Column {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                 navigationIcon = { IconButton(onClick = vm::closeApps) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت") } },
@@ -103,7 +104,9 @@ fun AppsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                     IconButton(onClick = vm::loadApps) { Icon(Icons.Filled.Refresh, "تازه‌سازی") }
                 },
             )
-        },
+                    MiniPlayerBar(vm.audio)
+        }
+    },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             if (apps == null) LinearProgressIndicator(Modifier.fillMaxWidth())

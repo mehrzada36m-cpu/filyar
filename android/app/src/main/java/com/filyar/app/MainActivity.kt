@@ -43,7 +43,6 @@ import com.filyar.app.ui.SettingsScreen
 import com.filyar.app.ui.ImageViewerScreen
 import com.filyar.app.ui.ProgressDialog
 import com.filyar.app.ui.ApkInstallDialog
-import com.filyar.app.ui.MiniPlayer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -171,12 +170,6 @@ private fun AppRoot(vm: BrowserViewModel) {
 
     val apkPrompt by vm.apkPrompt.collectAsStateWithLifecycle()
     val zipPrompt by vm.zipPrompt.collectAsStateWithLifecycle()
-    val miniPlayer by vm.miniPlayer.collectAsStateWithLifecycle()
-    miniPlayer?.let { f ->
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-            MiniPlayer(f, onClose = vm::closeMiniPlayer, modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 182.dp))
-        }
-    }
     apkPrompt?.let { ApkInstallDialog(it, vm) }
     zipPrompt?.let { ZipPreviewDialog(it, vm) }
 

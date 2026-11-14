@@ -266,55 +266,98 @@ fun Modifier.softShadow(radius: Dp): Modifier = this.drawBehind {
     }
 }
 
-/**
- * Slim, frosted audio player capsule. It keeps playing while you browse, and the × stops it.
- */
-@Composable
-fun MiniPlayer(file: RemoteFile, onClose: () -> Unit, modifier: Modifier = Modifier) {
-    val player = remember(file.path) { MediaPlayer() }
-    var ready by remember(file.path) { mutableStateOf(false) }
-    var playing by remember(file.path) { mutableStateOf(false) }
-    var failed by remember(file.path) { mutableStateOf(false) }
-    var duration by remember(file.path) { mutableStateOf(0) }
-    var position by remember(file.path) { mutableStateOf(0) }
-    var dragging by remember(file.path) { mutableStateOf(false) }
-    var dragValue by remember(file.path) { mutableStateOf(0f) }
+/** The audio that plays in the mini player. It lives in the ViewModel, so music keeps playing across screens. */
+class MiniAudio {
+    var file by mutableStateOf<RemoteFile?>(null)
+    var ready by mutableStateOf(false)
+    var playing by mutableStateOf(false)
+    var failed by mutableStateOf(false)
+    var duration by mutableStateOf(0)
+    var position by mutableStateOf(0)
+    private var player: MediaPlayer? = null
 
-    DisposableEffect(file.path) {
+    fun play(f: RemoteFile) {
+        release()
+        file = f
+        ready = false
+        playing = false
+        failed = false
+        duration = 0
+        position = 0
+        val mp = MediaPlayer()
+        player = mp
         try {
-            player.setDataSource(file.path)
-            player.setOnPreparedListener { mp ->
-                duration = mp.duration
+            mp.setDataSource(f.path)
+            mp.setOnPreparedListener {
+                duration = it.duration
                 ready = true
-                mp.start()
+                it.start()
                 playing = true
             }
-            player.setOnCompletionListener {
+            mp.setOnCompletionListener {
                 playing = false
                 position = duration
             }
-            player.setOnErrorListener { _, _, _ ->
+            mp.setOnErrorListener { _, _, _ ->
                 failed = true
                 playing = false
                 true
             }
-            player.prepareAsync()
+            mp.prepareAsync()
         } catch (e: Exception) {
             failed = true
         }
-        onDispose { runCatching { player.release() } }
     }
-    LaunchedEffect(playing, ready, file.path) {
-        while (playing && ready) {
-            if (!dragging) position = runCatching { player.currentPosition }.getOrDefault(0)
-            delay(300)
+
+    fun toggle() {
+        val mp = player ?: return
+        if (!ready) return
+        if (playing) {
+            mp.pause()
+            playing = false
+        } else {
+            mp.start()
+            playing = true
         }
     }
-    fun seekFraction(f: Float) {
+
+    fun seekFraction(fraction: Float) {
+        val mp = player ?: return
         if (ready && duration > 0) {
-            val target = (f.coerceIn(0f, 1f) * duration).toInt()
-            player.seekTo(target)
+            val target = (fraction.coerceIn(0f, 1f) * duration).toInt()
+            mp.seekTo(target)
             position = target
+        }
+    }
+
+    fun tick() {
+        if (playing && ready) position = runCatching { player?.currentPosition ?: 0 }.getOrDefault(0)
+    }
+
+    fun close() {
+        release()
+        file = null
+    }
+
+    private fun release() {
+        runCatching { player?.release() }
+        player = null
+    }
+}
+
+/**
+ * Slim, frosted audio capsule. Every screen places it right under its header, so it pushes the content down
+ * instead of covering cards or folders. The × stops the music.
+ */
+@Composable
+fun MiniPlayerBar(audio: MiniAudio) {
+    val f = audio.file ?: return
+    var dragging by remember { mutableStateOf(false) }
+    var dragValue by remember { mutableStateOf(0f) }
+    LaunchedEffect(audio.playing, audio.ready, f.path) {
+        while (audio.playing && audio.ready) {
+            if (!dragging) audio.tick()
+            delay(300)
         }
     }
 
@@ -326,9 +369,9 @@ fun MiniPlayer(file: RemoteFile, onClose: () -> Unit, modifier: Modifier = Modif
     )
     CompositionLocalProvider(LocalContentColor provides scheme.onSurface) {
         Column(
-            modifier
+            Modifier
                 .fillMaxWidth()
-                .softShadow(26.dp)
+                .padding(horizontal = 12.dp, vertical = 6.dp)
                 .clip(shape)
                 .background(Brush.verticalGradient(listOf(scheme.surfaceContainerHigh.copy(alpha = 0.92f), scheme.surfaceContainer.copy(alpha = 0.80f))))
                 .border(1.dp, rim, shape)
@@ -341,7 +384,7 @@ fun MiniPlayer(file: RemoteFile, onClose: () -> Unit, modifier: Modifier = Modif
                 ) { Icon(Icons.Filled.MusicNote, null, tint = scheme.primary, modifier = Modifier.size(18.dp)) }
                 Spacer(Modifier.width(10.dp))
                 Text(
-                    file.name.substringBeforeLast('.'),
+                    f.name.substringBeforeLast('.'),
                     style = MaterialTheme.typography.labelLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -349,48 +392,37 @@ fun MiniPlayer(file: RemoteFile, onClose: () -> Unit, modifier: Modifier = Modif
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    if (failed) "پخش ممکن نشد" else clock(if (dragging) (dragValue * duration).toInt() else position),
+                    if (audio.failed) "پخش ممکن نشد" else clock(if (dragging) (dragValue * audio.duration).toInt() else audio.position),
                     style = MaterialTheme.typography.labelSmall,
                     color = scheme.onSurfaceVariant,
                     maxLines = 1,
                 )
-                IconButton(
-                    onClick = {
-                        if (ready) {
-                            if (playing) {
-                                player.pause()
-                                playing = false
-                            } else {
-                                player.start()
-                                playing = true
-                            }
-                        }
-                    },
-                    modifier = Modifier.size(36.dp),
-                ) { Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (playing) "توقف" else "پخش", modifier = Modifier.size(22.dp)) }
-                IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = { audio.toggle() }, modifier = Modifier.size(36.dp)) {
+                    Icon(if (audio.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (audio.playing) "توقف" else "پخش", modifier = Modifier.size(22.dp))
+                }
+                IconButton(onClick = { audio.close() }, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Filled.Close, "بستن پخش‌کننده", modifier = Modifier.size(20.dp))
                 }
             }
             // Thin seek line, left to right; tap or drag to jump.
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                val shown = (if (dragging) dragValue else if (duration > 0) position.toFloat() / duration else 0f).coerceIn(0f, 1f)
+                val shown = (if (dragging) dragValue else if (audio.duration > 0) audio.position.toFloat() / audio.duration else 0f).coerceIn(0f, 1f)
                 Box(
                     Modifier
                         .fillMaxWidth()
                         .height(16.dp)
                         .padding(horizontal = 6.dp)
-                        .pointerInput(ready, duration) {
-                            detectTapGestures { o -> seekFraction(o.x / size.width) }
+                        .pointerInput(audio.ready, audio.duration) {
+                            detectTapGestures { o -> audio.seekFraction(o.x / size.width) }
                         }
-                        .pointerInput(ready, duration) {
+                        .pointerInput(audio.ready, audio.duration) {
                             detectHorizontalDragGestures(
                                 onDragStart = { o ->
                                     dragging = true
                                     dragValue = (o.x / size.width).coerceIn(0f, 1f)
                                 },
                                 onDragEnd = {
-                                    seekFraction(dragValue)
+                                    audio.seekFraction(dragValue)
                                     dragging = false
                                 },
                                 onDragCancel = { dragging = false },

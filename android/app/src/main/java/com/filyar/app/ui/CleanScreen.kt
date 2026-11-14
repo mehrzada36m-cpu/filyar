@@ -116,6 +116,7 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
+        Column {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                 navigationIcon = { IconButton(onClick = vm::closeClean) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت") } },
@@ -165,7 +166,9 @@ fun CleanScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                     ) { Icon(Icons.Filled.Refresh, "اسکن دوباره") }
                 },
             )
-        },
+                    MiniPlayerBar(vm.audio)
+        }
+    },
         bottomBar = {
             if (selected.isNotEmpty()) {
                 Surface(color = MaterialTheme.colorScheme.surfaceContainer) {

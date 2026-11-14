@@ -1319,7 +1319,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
             kindOf(f) == FileKind.Image && f.extension != "svg" -> eventChannel.trySend(UiEvent.ViewImage(f))
             (kindOf(f) == FileKind.Video || kindOf(f) == FileKind.Audio) && f.extension != "ts" ->
                 if (File(f.path).canRead() && !isRestricted(f.path)) {
-                    if (kindOf(f) == FileKind.Audio) _miniPlayer.value = f else eventChannel.trySend(UiEvent.Play(f))
+                    if (kindOf(f) == FileKind.Audio) audio.play(f) else eventChannel.trySend(UiEvent.Play(f))
                 } else {
                     openExternal(f, chooser = false)
                 }
@@ -1384,10 +1384,13 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ---------- built-in installer and ZIP preview ----------
-    private val _miniPlayer = MutableStateFlow<RemoteFile?>(null)
-    /** The audio file playing in the floating mini player, if any. */
-    val miniPlayer: StateFlow<RemoteFile?> = _miniPlayer.asStateFlow()
-    fun closeMiniPlayer() { _miniPlayer.value = null }
+    /** The mini audio player; it lives here so the music keeps playing while you move between screens. */
+    val audio = MiniAudio()
+
+    override fun onCleared() {
+        audio.close()
+        super.onCleared()
+    }
 
     private val _apkPrompt = MutableStateFlow<RemoteFile?>(null)
     val apkPrompt: StateFlow<RemoteFile?> = _apkPrompt.asStateFlow()

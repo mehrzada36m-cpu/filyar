@@ -78,12 +78,15 @@ fun SettingsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onBack: ()
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
+        Column {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت") } },
                 title = { Text("تنظیمات", style = MaterialTheme.typography.titleLarge) },
             )
-        },
+                    MiniPlayerBar(vm.audio)
+        }
+    },
     ) { pad ->
         Column(
             Modifier

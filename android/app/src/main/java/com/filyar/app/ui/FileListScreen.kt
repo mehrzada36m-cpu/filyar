@@ -55,6 +55,7 @@ fun FileListScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
+        Column {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                 navigationIcon = { IconButton(onClick = vm::closeListing) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت") } },
@@ -73,7 +74,9 @@ fun FileListScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                     }
                 },
             )
-        },
+                    MiniPlayerBar(vm.audio)
+        }
+    },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())

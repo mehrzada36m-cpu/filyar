@@ -276,6 +276,7 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
         containerColor = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onBackground,
         topBar = {
+        Column {
             when {
                 selecting -> SelectionTopBar(st.selection.size, onClose = vm::clearSelection, onSelectAll = vm::selectAll)
                 searching -> SearchTopBar(st.searchQuery.orEmpty(), st.path, vm.rootPath, onQuery = vm::search, onClose = vm::closeSearch)
@@ -306,7 +307,9 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
                     onShizuku = shizukuAction,
                 )
             }
-        },
+                    MiniPlayerBar(vm.audio)
+        }
+    },
         bottomBar = {
             when {
                 clip != null && st.path != null && !searching && !selecting -> PasteBar(
@@ -796,9 +799,9 @@ private fun SelectionBottomBar(
     Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 30.dp), contentAlignment = Alignment.BottomCenter) {
         Column(
             Modifier
-                .animateContentSize()
-                .then(if (moreOpen) Modifier.width(280.dp) else Modifier)
                 .softShadow(28.dp)
+                .animateContentSize()
+                .width(264.dp)
                 .clip(shape)
                 .background(fill)
                 .border(1.dp, rim, shape),
@@ -815,7 +818,7 @@ private fun SelectionBottomBar(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Row(
-                                Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                                Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(item.icon, null, tint = scheme.onSurface, modifier = Modifier.size(22.dp))
@@ -829,9 +832,9 @@ private fun SelectionBottomBar(
             }
             Row(
                 Modifier
-                    .then(if (moreOpen) Modifier.fillMaxWidth() else Modifier)
+                    .fillMaxWidth()
                     .padding(horizontal = 8.dp, vertical = 4.dp),
-                horizontalArrangement = if (moreOpen) Arrangement.SpaceEvenly else Arrangement.spacedBy(2.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 CapsuleAction(Icons.Filled.ContentCopy, "کپی", onCopy)

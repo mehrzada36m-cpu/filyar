@@ -90,6 +90,7 @@ fun EditorScreen(file: RemoteFile, vm: BrowserViewModel, snackbar: SnackbarHostS
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
+        Column {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
                 navigationIcon = {
@@ -118,7 +119,9 @@ fun EditorScreen(file: RemoteFile, vm: BrowserViewModel, snackbar: SnackbarHostS
                     IconButton(onClick = save, enabled = dirty && !saving) { Icon(Icons.Filled.Save, "ذخیره") }
                 },
             )
-        },
+                    MiniPlayerBar(vm.audio)
+        }
+    },
     ) { pad ->
         Box(
             Modifier
