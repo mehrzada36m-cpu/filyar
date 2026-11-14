@@ -1,6 +1,8 @@
 package com.filyar.app.ui
 
 import android.net.Uri
+import android.os.Looper
+import android.os.Handler
 import com.filyar.app.PlaybackService
 import androidx.compose.ui.graphics.Shape
 import android.content.Intent
@@ -275,7 +277,7 @@ fun Modifier.softShadow(radius: Dp): Modifier = this.drawBehind {
 
 /** The frosted look shared by the floating capsules: same colour, same transparency, same light rim. */
 @Composable
-fun Modifier.glassCapsule(shape: Shape): Modifier {
+fun Modifier.glassCapsule(shape: Shape, opacity: Float = 1f): Modifier {
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < 0.5f
     val rim = Brush.linearGradient(
@@ -283,7 +285,7 @@ fun Modifier.glassCapsule(shape: Shape): Modifier {
     )
     return this
         .clip(shape)
-        .background(Brush.verticalGradient(listOf(scheme.surfaceContainerHigh.copy(alpha = 0.92f), scheme.surfaceContainer.copy(alpha = 0.80f))))
+        .background(Brush.verticalGradient(listOf(scheme.surfaceContainerHigh.copy(alpha = 0.92f * opacity), scheme.surfaceContainer.copy(alpha = 0.80f * opacity))))
         .border(1.dp, rim, shape)
 }
 
@@ -299,6 +301,9 @@ class MiniAudio private constructor(private val app: Context) {
 
     /** Set by the playback service, so the notification follows every change. */
     var listener: (() -> Unit)? = null
+
+    /** Gives the track that follows [RemoteFile] (set by the ViewModel); null when it was the last. */
+    var nextProvider: ((RemoteFile) -> RemoteFile?)? = null
     private fun changed() { listener?.invoke() }
 
     var file by mutableStateOf<RemoteFile?>(null)
@@ -331,9 +336,28 @@ class MiniAudio private constructor(private val app: Context) {
                 changed()
             }
             mp.setOnCompletionListener {
-                playing = false
                 position = duration
-                changed()
+                val current = file
+                val provider = nextProvider
+                if (current == null || provider == null) {
+                    playing = false
+                    changed()
+                } else {
+                    // Look for the next song off the main thread, then start it.
+                    Thread {
+                        val next = runCatching { provider(current) }.getOrNull()
+                        Handler(Looper.getMainLooper()).post {
+                            if (file?.path == current.path) {
+                                if (next != null) {
+                                    play(next)
+                                } else {
+                                    playing = false
+                                    changed()
+                                }
+                            }
+                        }
+                    }.start()
+                }
             }
             mp.setOnErrorListener { _, _, _ ->
                 failed = true
@@ -441,7 +465,7 @@ fun MiniPlayerBar(vm: BrowserViewModel, beforeOpen: () -> Unit = {}) {
                 .fillMaxWidth()
                 .padding(horizontal = 13.dp, vertical = 4.dp)
                 .height(40.dp)
-                .glassCapsule(pill)
+                .glassCapsule(pill, opacity = 0.5f)
                 .clickable {
                     beforeOpen()
                     vm.openMusic()

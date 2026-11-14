@@ -149,6 +149,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.ui.draw.alpha
 import com.filyar.app.core.ShizukuStatus
 import com.filyar.app.core.SortBy
@@ -325,30 +326,43 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
         },
         floatingActionButton = {
             var fabOpen by remember { mutableStateOf(false) }
+            val topCorner by animateDpAsState(if (fabOpen) 0.dp else 20.dp, label = "fabCorner")
             AnimatedVisibility(!selecting && !searching && st.path != null && clip == null, enter = scaleIn(), exit = scaleOut()) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // The capsule slides open above the button, with just the two icons.
+                // Extra margin: 48dp from the bottom and 32dp from the side (the default is 16dp).
+                Column(
+                    Modifier.padding(start = 16.dp, end = 16.dp, bottom = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    // A card in the button's colour and width, joined to it, that slides open upwards.
                     AnimatedVisibility(
                         visible = fabOpen,
                         enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
                         exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut(),
                     ) {
-                        Column(Modifier.glassCapsule(RoundedCornerShape(28.dp)).padding(vertical = 4.dp)) {
-                            CapsuleAction(Icons.Filled.CreateNewFolder, "پوشه‌ی جدید", {
-                                fabOpen = false
-                                dlg = Dlg.NewFolder
-                            })
-                            CapsuleAction(Icons.AutoMirrored.Filled.NoteAdd, "فایل جدید", {
-                                fabOpen = false
-                                dlg = Dlg.NewFile
-                            })
+                        Surface(
+                            color = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                            shadowElevation = 6.dp,
+                            modifier = Modifier.width(56.dp),
+                        ) {
+                            Column(Modifier.padding(top = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                CapsuleAction(Icons.Filled.CreateNewFolder, "پوشه‌ی جدید", {
+                                    fabOpen = false
+                                    dlg = Dlg.NewFolder
+                                }, tint = MaterialTheme.colorScheme.onPrimary)
+                                CapsuleAction(Icons.AutoMirrored.Filled.NoteAdd, "فایل جدید", {
+                                    fabOpen = false
+                                    dlg = Dlg.NewFile
+                                }, tint = MaterialTheme.colorScheme.onPrimary)
+                            }
                         }
                     }
                     FloatingActionButton(
                         onClick = { fabOpen = !fabOpen },
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(topStart = topCorner, topEnd = topCorner, bottomStart = 20.dp, bottomEnd = 20.dp),
                     ) { Icon(if (fabOpen) Icons.Filled.Close else Icons.Filled.Add, "ساختن") }
                 }
             }
