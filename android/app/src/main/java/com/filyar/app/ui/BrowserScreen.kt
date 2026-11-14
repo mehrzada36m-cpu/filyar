@@ -309,31 +309,7 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
         },
         bottomBar = {
             when {
-                selecting -> SelectionBottomBar(
-                    onCopy = { vm.setClip(vm.selectedItems(), cut = false) },
-                    onCut = { vm.setClip(vm.selectedItems(), cut = true) },
-                    onShare = { vm.share(vm.selectedItems()) },
-                    onDelete = { dlg = Dlg.Delete(vm.selectedItems()) },
-                    extra = buildList {
-                        val picked = vm.selectedItems()
-                        val one = picked.singleOrNull()
-                        if (one != null) add(MoreItem(Icons.Filled.DriveFileRenameOutline, "تغییر نام") { dlg = Dlg.Rename(one) })
-                        if (one != null && one.isDirectory) add(MoreItem(Icons.Filled.Palette, "تغییر آیکون پوشه") { dlg = Dlg.FolderStyleDlg(one) })
-                        add(MoreItem(Icons.Filled.FolderZip, "فشرده‌سازی (ZIP)") { dlg = Dlg.Compress(picked) })
-                        if (one != null && one.isDirectory) {
-                            val saved = one.path in quickAccess
-                            add(
-                                MoreItem(
-                                    if (saved) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
-                                    if (saved) "حذف از دسترسی سریع" else "افزودن به دسترسی سریع",
-                                ) { vm.toggleQuickAccess(one.path) },
-                            )
-                        }
-                        if (one != null) add(MoreItem(Icons.Filled.Info, "مشخصات") { dlg = Dlg.Props(one) })
-                        add(MoreItem(Icons.Filled.SelectAll, "انتخاب همه") { vm.selectAll() })
-                    },
-                )
-                clip != null && st.path != null && !searching -> PasteBar(
+                clip != null && st.path != null && !searching && !selecting -> PasteBar(
                     count = clip!!.items.size,
                     cut = clip!!.cut,
                     onPaste = vm::paste,
@@ -410,6 +386,35 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
             }
         }
     }
+        // The selection capsule floats over the list, so nothing around it is hidden.
+        if (selecting) {
+            Box(Modifier.align(Alignment.BottomCenter)) {
+                SelectionBottomBar(
+                    onCopy = { vm.setClip(vm.selectedItems(), cut = false) },
+                    onCut = { vm.setClip(vm.selectedItems(), cut = true) },
+                    onShare = { vm.share(vm.selectedItems()) },
+                    onDelete = { dlg = Dlg.Delete(vm.selectedItems()) },
+                    extra = buildList {
+                        val picked = vm.selectedItems()
+                        val one = picked.singleOrNull()
+                        if (one != null) add(MoreItem(Icons.Filled.DriveFileRenameOutline, "تغییر نام") { dlg = Dlg.Rename(one) })
+                        if (one != null && one.isDirectory) add(MoreItem(Icons.Filled.Palette, "تغییر آیکون پوشه") { dlg = Dlg.FolderStyleDlg(one) })
+                        add(MoreItem(Icons.Filled.FolderZip, "فشرده‌سازی (ZIP)") { dlg = Dlg.Compress(picked) })
+                        if (one != null && one.isDirectory) {
+                            val saved = one.path in quickAccess
+                            add(
+                                MoreItem(
+                                    if (saved) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
+                                    if (saved) "حذف از دسترسی سریع" else "افزودن به دسترسی سریع",
+                                ) { vm.toggleQuickAccess(one.path) },
+                            )
+                        }
+                        if (one != null) add(MoreItem(Icons.Filled.Info, "مشخصات") { dlg = Dlg.Props(one) })
+                        add(MoreItem(Icons.Filled.SelectAll, "انتخاب همه") { vm.selectAll() })
+                    },
+                )
+            }
+        }
     }
 
     // ---------- dialogs & sheets ----------
@@ -793,7 +798,7 @@ private fun SelectionBottomBar(
             Modifier
                 .animateContentSize()
                 .then(if (moreOpen) Modifier.width(280.dp) else Modifier)
-                .shadow(8.dp, shape, ambientColor = Color.Black.copy(alpha = 0.25f), spotColor = Color.Black.copy(alpha = 0.25f))
+                .softShadow(28.dp)
                 .clip(shape)
                 .background(fill)
                 .border(1.dp, rim, shape),

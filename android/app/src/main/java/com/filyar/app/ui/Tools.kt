@@ -1,6 +1,20 @@
 package com.filyar.app.ui
 
 import android.net.Uri
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import kotlinx.coroutines.delay
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Brush
@@ -46,6 +60,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -233,9 +249,25 @@ private fun clock(ms: Int): String {
     return "${faNum(total / 60)}:${faNum(total % 60).padStart(2, '۰')}"
 }
 
+/** Soft shadow drawn only outside a rounded shape, so translucent surfaces stay clean. */
+fun Modifier.softShadow(radius: Dp): Modifier = this.drawBehind {
+    val r = radius.toPx()
+    val hole = Path().apply { addRoundRect(RoundRect(0f, 0f, size.width, size.height, CornerRadius(r))) }
+    clipPath(hole, clipOp = ClipOp.Difference) {
+        listOf(14.dp to 0.06f, 8.dp to 0.10f, 3.dp to 0.16f).forEach { (grow, alpha) ->
+            val g = grow.toPx()
+            drawRoundRect(
+                color = Color.Black.copy(alpha = alpha),
+                topLeft = Offset(-g, -g + 6.dp.toPx()),
+                size = Size(size.width + 2 * g, size.height + 2 * g),
+                cornerRadius = CornerRadius(r + g),
+            )
+        }
+    }
+}
+
 /**
- * Floating, frosted audio player that sits at the bottom of the screen. It keeps playing while you
- * browse, and the × stops it.
+ * Slim, frosted audio player capsule. It keeps playing while you browse, and the × stops it.
  */
 @Composable
 fun MiniPlayer(file: RemoteFile, onClose: () -> Unit, modifier: Modifier = Modifier) {
@@ -278,67 +310,98 @@ fun MiniPlayer(file: RemoteFile, onClose: () -> Unit, modifier: Modifier = Modif
             delay(300)
         }
     }
+    fun seekFraction(f: Float) {
+        if (ready && duration > 0) {
+            val target = (f.coerceIn(0f, 1f) * duration).toInt()
+            player.seekTo(target)
+            position = target
+        }
+    }
 
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < 0.5f
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RoundedCornerShape(26.dp)
     val rim = Brush.linearGradient(
         listOf(Color.White.copy(alpha = if (dark) 0.30f else 1f), Color.White.copy(alpha = if (dark) 0.06f else 0.35f)),
     )
-    Column(
-        modifier
-            .fillMaxWidth()
-            .shadow(10.dp, shape, ambientColor = Color.Black.copy(alpha = 0.25f), spotColor = Color.Black.copy(alpha = 0.25f))
-            .clip(shape)
-            .background(Brush.verticalGradient(listOf(scheme.surfaceContainerHigh.copy(alpha = 0.92f), scheme.surfaceContainer.copy(alpha = 0.80f))))
-            .border(1.dp, rim, shape)
-            .padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 2.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(40.dp).clip(CircleShape).background(scheme.primary.copy(alpha = 0.16f)),
-                contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Filled.MusicNote, null, tint = scheme.primary, modifier = Modifier.size(22.dp)) }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(file.name.substringBeforeLast('.'), style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    CompositionLocalProvider(LocalContentColor provides scheme.onSurface) {
+        Column(
+            modifier
+                .fillMaxWidth()
+                .softShadow(26.dp)
+                .clip(shape)
+                .background(Brush.verticalGradient(listOf(scheme.surfaceContainerHigh.copy(alpha = 0.92f), scheme.surfaceContainer.copy(alpha = 0.80f))))
+                .border(1.dp, rim, shape)
+                .padding(start = 10.dp, end = 4.dp, top = 4.dp, bottom = 2.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(30.dp).clip(CircleShape).background(scheme.primary.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Filled.MusicNote, null, tint = scheme.primary, modifier = Modifier.size(18.dp)) }
+                Spacer(Modifier.width(10.dp))
                 Text(
-                    if (failed) "پخش ممکن نشد" else "${clock(if (dragging) (dragValue * duration).toInt() else position)} / ${clock(duration)}",
+                    file.name.substringBeforeLast('.'),
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    if (failed) "پخش ممکن نشد" else clock(if (dragging) (dragValue * duration).toInt() else position),
                     style = MaterialTheme.typography.labelSmall,
                     color = scheme.onSurfaceVariant,
+                    maxLines = 1,
                 )
-            }
-            IconButton(
-                onClick = {
-                    if (ready) {
-                        if (playing) {
-                            player.pause()
-                            playing = false
-                        } else {
-                            player.start()
-                            playing = true
+                IconButton(
+                    onClick = {
+                        if (ready) {
+                            if (playing) {
+                                player.pause()
+                                playing = false
+                            } else {
+                                player.start()
+                                playing = true
+                            }
                         }
-                    }
-                },
-            ) { Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (playing) "توقف" else "پخش") }
-            IconButton(onClick = onClose) { Icon(Icons.Filled.Close, "بستن پخش‌کننده") }
-        }
-        Slider(
-            value = if (dragging) dragValue else if (duration > 0) position.toFloat() / duration else 0f,
-            onValueChange = {
-                dragging = true
-                dragValue = it
-            },
-            onValueChangeFinished = {
-                if (ready && duration > 0) {
-                    val target = (dragValue * duration).toInt()
-                    player.seekTo(target)
-                    position = target
+                    },
+                    modifier = Modifier.size(36.dp),
+                ) { Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (playing) "توقف" else "پخش", modifier = Modifier.size(22.dp)) }
+                IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Filled.Close, "بستن پخش‌کننده", modifier = Modifier.size(20.dp))
                 }
-                dragging = false
-            },
-            enabled = ready,
-            modifier = Modifier.height(28.dp).padding(end = 8.dp),
-        )
+            }
+            // Thin seek line, left to right; tap or drag to jump.
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                val shown = (if (dragging) dragValue else if (duration > 0) position.toFloat() / duration else 0f).coerceIn(0f, 1f)
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(16.dp)
+                        .padding(horizontal = 6.dp)
+                        .pointerInput(ready, duration) {
+                            detectTapGestures { o -> seekFraction(o.x / size.width) }
+                        }
+                        .pointerInput(ready, duration) {
+                            detectHorizontalDragGestures(
+                                onDragStart = { o ->
+                                    dragging = true
+                                    dragValue = (o.x / size.width).coerceIn(0f, 1f)
+                                },
+                                onDragEnd = {
+                                    seekFraction(dragValue)
+                                    dragging = false
+                                },
+                                onDragCancel = { dragging = false },
+                            ) { change, _ -> dragValue = (change.position.x / size.width).coerceIn(0f, 1f) }
+                        },
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    Box(Modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(scheme.onSurface.copy(alpha = 0.15f)))
+                    Box(Modifier.fillMaxWidth(shown).height(3.dp).clip(CircleShape).background(scheme.primary))
+                }
+            }
+        }
     }
 }

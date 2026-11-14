@@ -173,8 +173,8 @@ private fun AppRoot(vm: BrowserViewModel) {
     val zipPrompt by vm.zipPrompt.collectAsStateWithLifecycle()
     val miniPlayer by vm.miniPlayer.collectAsStateWithLifecycle()
     miniPlayer?.let { f ->
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-            MiniPlayer(f, onClose = vm::closeMiniPlayer, modifier = Modifier.navigationBarsPadding().padding(horizontal = 12.dp, vertical = 12.dp))
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            MiniPlayer(f, onClose = vm::closeMiniPlayer, modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 182.dp))
         }
     }
     apkPrompt?.let { ApkInstallDialog(it, vm) }
