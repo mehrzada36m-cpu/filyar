@@ -10,6 +10,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
@@ -27,48 +32,66 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/** A glossy glass folder: variant 0 is deep blue, variant 1 is light cyan. */
+/**
+ * A frosted glass folder: a tinted back plate, the newest file peeking out as a white card, and a translucent
+ * front panel with a bright rim. Variant 0 is blue, variant 1 is cyan.
+ */
 @Composable
-fun GlassFolderIcon(size: Dp, variant: Int, modifier: Modifier = Modifier) {
-    val top = if (variant == 0) Color(0xFF6BB6FF) else Color(0xFFC8F7FB)
-    val bottom = if (variant == 0) Color(0xFF2F6FDB) else Color(0xFF3DD3EA)
-    val edge = if (variant == 0) Color(0xFF1E48B8) else Color(0xFF6FE0F0)
-    Canvas(modifier.size(size)) {
-        val w = this.size.width
-        val h = this.size.height
-        fun p(x: Float, y: Float) = Offset(x * w, y * h)
-        val r = 0.07f
-        val body = Path().apply {
-            moveTo((0.06f + r) * w, 0.16f * h)
-            lineTo(0.37f * w, 0.16f * h)
-            cubicTo(0.43f * w, 0.16f * h, 0.45f * w, 0.27f * h, 0.52f * w, 0.27f * h)
-            lineTo((0.94f - r) * w, 0.27f * h)
-            quadraticBezierTo(0.94f * w, 0.27f * h, 0.94f * w, (0.27f + r) * h)
-            lineTo(0.94f * w, (0.88f - r) * h)
-            quadraticBezierTo(0.94f * w, 0.88f * h, (0.94f - r) * w, 0.88f * h)
-            lineTo((0.06f + r) * w, 0.88f * h)
-            quadraticBezierTo(0.06f * w, 0.88f * h, 0.06f * w, (0.88f - r) * h)
-            lineTo(0.06f * w, (0.16f + r) * h)
-            quadraticBezierTo(0.06f * w, 0.16f * h, (0.06f + r) * w, 0.16f * h)
-            close()
-        }
-        // soft reflection under the folder
-        drawOval(bottom.copy(alpha = 0.14f), topLeft = p(0.12f, 0.90f), size = Size(0.76f * w, 0.07f * h))
-        drawPath(body, Brush.linearGradient(listOf(top, bottom), start = p(0.2f, 0.1f), end = p(0.8f, 0.95f)))
-        clipPath(body) {
-            val sheen = Path().apply {
-                moveTo(0.06f * w, 0.88f * h)
-                lineTo(0.50f * w, 0.88f * h)
-                lineTo(0.94f * w, 0.40f * h)
-                lineTo(0.94f * w, 0.27f * h)
-                lineTo(0.70f * w, 0.27f * h)
-                lineTo(0.06f * w, 0.80f * h)
+fun GlassFolderIcon(size: Dp, variant: Int, modifier: Modifier = Modifier, peek: (@Composable () -> Unit)? = null) {
+    val deep = if (variant == 0) Color(0xFF5B7CF0) else Color(0xFF27BFD6)
+    val light = if (variant == 0) Color(0xFF93AAFF) else Color(0xFF86E6F1)
+    Box(modifier.size(size)) {
+        Canvas(Modifier.fillMaxSize()) {
+            val w = this.size.width
+            val h = this.size.height
+            val r = 0.07f
+            val plate = Path().apply {
+                moveTo((0.06f + r) * w, 0.12f * h)
+                lineTo(0.37f * w, 0.12f * h)
+                cubicTo(0.43f * w, 0.12f * h, 0.45f * w, 0.23f * h, 0.52f * w, 0.23f * h)
+                lineTo((0.94f - r) * w, 0.23f * h)
+                quadraticBezierTo(0.94f * w, 0.23f * h, 0.94f * w, (0.23f + r) * h)
+                lineTo(0.94f * w, (0.88f - r) * h)
+                quadraticBezierTo(0.94f * w, 0.88f * h, (0.94f - r) * w, 0.88f * h)
+                lineTo((0.06f + r) * w, 0.88f * h)
+                quadraticBezierTo(0.06f * w, 0.88f * h, 0.06f * w, (0.88f - r) * h)
+                lineTo(0.06f * w, (0.12f + r) * h)
+                quadraticBezierTo(0.06f * w, 0.12f * h, (0.06f + r) * w, 0.12f * h)
                 close()
             }
-            drawPath(sheen, Color.White.copy(alpha = 0.18f))
-            drawPath(body, Color.White.copy(alpha = 0.35f), style = Stroke(width = 0.05f * w))
+            drawOval(deep.copy(alpha = 0.14f), topLeft = Offset(0.12f * w, 0.90f * h), size = Size(0.76f * w, 0.07f * h))
+            drawPath(plate, Brush.linearGradient(listOf(light, deep), start = Offset(0.2f * w, 0.1f * h), end = Offset(0.8f * w, 0.95f * h)))
         }
-        drawPath(body, edge, style = Stroke(width = 0.028f * w))
+        if (peek != null) {
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = size * 0.17f)
+                    .size(size * 0.62f)
+                    .clip(RoundedCornerShape(size * 0.07f))
+                    .background(Color.White),
+            ) { peek() }
+        }
+        Canvas(Modifier.fillMaxSize()) {
+            val w = this.size.width
+            val h = this.size.height
+            val topLeft = Offset(0.06f * w, 0.50f * h)
+            val panel = Size(0.88f * w, 0.38f * h)
+            val corner = CornerRadius(0.10f * w)
+            drawRoundRect(
+                brush = Brush.verticalGradient(listOf(light.copy(alpha = 0.80f), deep.copy(alpha = 0.74f)), startY = 0.5f * h, endY = 0.88f * h),
+                topLeft = topLeft,
+                size = panel,
+                cornerRadius = corner,
+            )
+            drawRoundRect(
+                brush = Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.65f), Color.White.copy(alpha = 0.05f)), startY = 0.5f * h, endY = 0.7f * h),
+                topLeft = topLeft,
+                size = panel,
+                cornerRadius = corner,
+                style = Stroke(width = 0.018f * w),
+            )
+        }
     }
 }
 

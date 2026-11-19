@@ -311,17 +311,21 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
                     onShizuku = shizukuAction,
                 )
             }
-                    MiniPlayerBar(vm)
+                    if (st.path == null) MiniPlayerBar(vm)
         }
     },
         bottomBar = {
-            when {
-                clip != null && st.path != null && !searching && !selecting -> PasteBar(
-                    count = clip!!.items.size,
-                    cut = clip!!.cut,
-                    onPaste = vm::paste,
-                    onCancel = vm::clearClip,
-                )
+            Column {
+                when {
+                    clip != null && st.path != null && !searching && !selecting -> PasteBar(
+                        count = clip!!.items.size,
+                        cut = clip!!.cut,
+                        onPaste = vm::paste,
+                        onCancel = vm::clearClip,
+                    )
+                }
+                // Inside a folder the player opens down here (the slim pill is for the other screens).
+                if (st.path != null && !selecting) MiniPlayerBottom(vm)
             }
         },
         floatingActionButton = {

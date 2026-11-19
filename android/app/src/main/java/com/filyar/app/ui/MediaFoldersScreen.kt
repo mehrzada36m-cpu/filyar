@@ -57,6 +57,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import com.filyar.app.core.HomeStyle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -182,7 +183,11 @@ private fun FolderTile(f: MediaFolderInfo, vm: BrowserViewModel, onClick: () -> 
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // The newest file stands in as the folder's preview.
-        FileIcon(f.newest, vm.backend, 64.dp, selected = false)
+        if (LocalViewPrefs.current.homeStyle == HomeStyle.Glass) {
+            GlassFolderIcon(64.dp, f.path.hashCode() and 1, peek = { FilePreview(f.newest, vm.backend, 40.dp) })
+        } else {
+            FileIcon(f.newest, vm.backend, 64.dp, selected = false)
+        }
         Spacer(Modifier.height(6.dp))
         Text(
             f.path.substringAfterLast('/'),

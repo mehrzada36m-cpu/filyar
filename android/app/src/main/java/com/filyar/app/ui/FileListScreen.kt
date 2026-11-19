@@ -54,6 +54,7 @@ fun FileListScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
+        bottomBar = { MiniPlayerBottom(vm) },
         topBar = {
         Column {
             TopAppBar(
@@ -74,8 +75,7 @@ fun FileListScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                     }
                 },
             )
-                    MiniPlayerBar(vm)
-        }
+                }
     },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {

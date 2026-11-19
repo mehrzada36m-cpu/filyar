@@ -1,6 +1,7 @@
 package com.filyar.app.ui
 
 import android.net.Uri
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.material3.DropdownMenu
 import android.os.Looper
@@ -544,6 +545,115 @@ fun MiniPlayerBar(vm: BrowserViewModel, beforeOpen: () -> Unit = {}) {
                     },
             ) {
                 Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(shown).height(3.dp).clip(CircleShape).background(blue))
+            }
+        }
+    }
+}
+
+/**
+ * The large player that opens at the bottom of the screen while you browse inside a folder: a glass capsule
+ * with a big round play button, artist and title, a red progress line and the time. White in the light theme,
+ * warm dark grey in the dark theme.
+ */
+@Composable
+fun MiniPlayerBottom(vm: BrowserViewModel) {
+    val audio = vm.audio
+    val f = audio.file ?: return
+    var dragging by remember { mutableStateOf(false) }
+    var dragValue by remember { mutableStateOf(0f) }
+    LaunchedEffect(audio.playing, audio.ready, f.path) {
+        while (audio.playing && audio.ready) {
+            if (!dragging) audio.tick()
+            delay(300)
+        }
+    }
+
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val shape = RoundedCornerShape(40.dp)
+    val body = if (dark) {
+        Brush.verticalGradient(listOf(Color(0xFF5A5450).copy(alpha = 0.92f), Color(0xFF3C3735).copy(alpha = 0.86f)))
+    } else {
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.95f), Color(0xFFF1F3F6).copy(alpha = 0.85f)))
+    }
+    val rim = Brush.linearGradient(
+        listOf(Color.White.copy(alpha = if (dark) 0.35f else 1f), Color.White.copy(alpha = if (dark) 0.05f else 0.45f)),
+    )
+    val ink = if (dark) Color(0xFFF4F1EE) else Color(0xFF1C1B1A)
+    val sub = if (dark) Color(0xFFB9B1AB) else Color(0xFF7A7570)
+    val track = if (dark) Color.White.copy(alpha = 0.85f) else Color(0xFFD9DCE1)
+    val red = Color(0xFFD9504B)
+    val clean = f.name.substringBeforeLast('.').replace('_', ' ').trim()
+    val parts = clean.split(" - ", limit = 2)
+    val artist = if (parts.size == 2) parts[0].trim() else f.parent.substringAfterLast('/')
+    val title = if (parts.size == 2) parts[1].trim() else clean
+    val shown = (if (dragging) dragValue else if (audio.duration > 0) audio.position.toFloat() / audio.duration else 0f).coerceIn(0f, 1f)
+
+    CompositionLocalProvider(LocalContentColor provides ink, LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 13.dp, vertical = 8.dp)
+                .clip(shape)
+                .background(body)
+                .border(1.dp, rim, shape),
+        ) {
+            Row(Modifier.padding(start = 12.dp, end = 8.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .size(58.dp)
+                        .clip(CircleShape)
+                        .background(Brush.verticalGradient(listOf(Color(0xFFE5706B), Color(0xFFC2403D))))
+                        .border(2.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.5f), Color.Black.copy(alpha = 0.15f))), CircleShape)
+                        .clickable { audio.toggle() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        if (audio.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        if (audio.playing) "توقف" else "پخش",
+                        tint = Color.White,
+                        modifier = Modifier.size(32.dp),
+                    )
+                }
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(if (audio.failed) "پخش ممکن نشد" else artist, color = sub, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(title, color = ink, fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(16.dp)
+                            .pointerInput(audio.ready, audio.duration) {
+                                detectTapGestures { o -> audio.seekFraction(o.x / size.width) }
+                            }
+                            .pointerInput(audio.ready, audio.duration) {
+                                detectHorizontalDragGestures(
+                                    onDragStart = { o ->
+                                        dragging = true
+                                        dragValue = (o.x / size.width).coerceIn(0f, 1f)
+                                    },
+                                    onDragEnd = {
+                                        audio.seekFraction(dragValue)
+                                        dragging = false
+                                    },
+                                    onDragCancel = { dragging = false },
+                                ) { change, _ -> dragValue = (change.position.x / size.width).coerceIn(0f, 1f) }
+                            },
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        Box(Modifier.fillMaxWidth().height(5.dp).clip(CircleShape).background(track))
+                        Box(Modifier.fillMaxWidth(shown).height(5.dp).clip(CircleShape).background(red))
+                    }
+                    Text(
+                        "${clock(if (dragging) (dragValue * audio.duration).toInt() else audio.position)} / ${clock(audio.duration)}",
+                        color = sub,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                    )
+                }
+                IconButton(onClick = { audio.close() }, modifier = Modifier.size(32.dp).align(Alignment.Top)) {
+                    Icon(Icons.Filled.Close, "بستن پخش‌کننده", tint = sub, modifier = Modifier.size(20.dp))
+                }
             }
         }
     }

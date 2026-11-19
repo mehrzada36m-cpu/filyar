@@ -37,6 +37,7 @@ import com.filyar.app.ui.BrowserScreen
 import com.filyar.app.ui.BrowserViewModel
 import com.filyar.app.ui.CleanScreen
 import com.filyar.app.ui.EditorScreen
+import com.filyar.app.ui.LocalFileBackend
 import com.filyar.app.ui.LocalFolderStyles
 import com.filyar.app.ui.LocalViewPrefs
 import com.filyar.app.ui.SettingsScreen
@@ -89,6 +90,7 @@ class MainActivity : ComponentActivity() {
                     LocalLayoutDirection provides LayoutDirection.Rtl,
                     LocalViewPrefs provides vp,
                     LocalFolderStyles provides styles,
+                    LocalFileBackend provides vm.backend,
                 ) {
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                         AppRoot(vm)

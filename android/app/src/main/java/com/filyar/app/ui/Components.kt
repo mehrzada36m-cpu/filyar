@@ -46,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -88,6 +89,31 @@ fun metaLine(f: RemoteFile): String = if (f.isDirectory) {
 /** Folder looks and display settings, provided once at the top of the screen. */
 val LocalFolderStyles = staticCompositionLocalOf<Map<String, FolderStyle>> { emptyMap() }
 val LocalViewPrefs = staticCompositionLocalOf { ViewPrefs() }
+
+/** The file backend of the app, so a folder icon can look inside its folder. */
+val LocalFileBackend = staticCompositionLocalOf<FileBackend?> { null }
+
+/** Finds (and remembers) the newest file inside a folder, which the glass folder shows as a card peeking out. */
+object FolderPeek {
+    private val cache = java.util.concurrent.ConcurrentHashMap<String, java.util.Optional<RemoteFile>>()
+
+    fun cached(path: String): RemoteFile? = cache[path]?.orElse(null)
+
+    fun has(path: String): Boolean = cache.containsKey(path)
+
+    fun load(backend: FileBackend, path: String): RemoteFile? {
+        if (cache.size > 600) cache.clear()
+        val newest = runCatching { backend.list(path) }.getOrDefault(emptyList())
+            .filter { !it.isDirectory && !it.isHidden }
+            .maxByOrNull { it.lastModified }
+        cache[path] = java.util.Optional.ofNullable(newest)
+        return newest
+    }
+}
+
+/** A file's preview (thumbnail or type icon), for use outside this file. */
+@Composable
+fun FilePreview(f: RemoteFile, backend: FileBackend, size: Dp) = FileGlyph(f, backend, size)
 
 val ItemSize.rowIcon: Dp
     get() = when (this) {
@@ -157,7 +183,14 @@ fun FolderGlyph(path: String, name: String, size: Dp, modifier: Modifier = Modif
     Box(modifier.size(size)) {
         if (glass) {
             val variant = path.hashCode() and 1
-            GlassFolderIcon(size, variant)
+            val backend = LocalFileBackend.current
+            val newest by produceState<RemoteFile?>(FolderPeek.cached(path), path, backend) {
+                if (backend != null && !FolderPeek.has(path)) value = withContext(Dispatchers.IO) { FolderPeek.load(backend, path) }
+            }
+            val shown = newest
+            val peek: (@Composable () -> Unit)? =
+                if (backend != null && shown != null && size >= 40.dp) ({ FilePreview(shown, backend, size * 0.62f) }) else null
+            GlassFolderIcon(size, variant, peek = peek)
             val hasOwnIcon = customIcon != null || builtin != null || (a == null && appIcons && FolderIcons.appFallbackFor(name) != null)
             if (hasOwnIcon) {
                 Icon(
