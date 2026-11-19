@@ -512,7 +512,7 @@ private fun QuickTile(
                 )
             }
         }
-        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+        GlassMenu(expanded = menu, onDismissRequest = { menu = false }) {
             DropdownMenuItem(
                 text = { Text("تغییر آیکون، رنگ و شکل") },
                 leadingIcon = { Icon(Icons.Filled.Palette, null) },

@@ -153,7 +153,7 @@ fun MediaFoldersScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                     item(key = "empty") { EmptyNote("هیچ پوشه‌ای با این نوع فایل در حافظه نیست.") }
                 }
                 items(folders.chunked(4), key = { row -> row.first().path }) { row ->
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 13.dp)) {
                         row.forEach { f ->
                             Box(Modifier.weight(1f)) { FolderTile(f, vm) { vm.showMediaFolder(f.path) } }
                         }

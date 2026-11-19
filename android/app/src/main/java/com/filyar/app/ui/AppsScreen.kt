@@ -167,7 +167,7 @@ private fun AppRow(e: AppEntry, vm: BrowserViewModel) {
                 IconButton(onClick = { menu = true }, modifier = Modifier.size(38.dp)) {
                     Icon(Icons.Filled.MoreVert, "بیشتر", modifier = Modifier.size(20.dp))
                 }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                GlassMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(
                         text = { Text("ذخیره‌ی APK در Download") },
                         leadingIcon = { Icon(Icons.Filled.Download, null) },

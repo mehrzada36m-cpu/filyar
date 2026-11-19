@@ -333,18 +333,19 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
                     Modifier.padding(start = 16.dp, end = 16.dp, bottom = 32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    // A card in the button's colour and width, joined to it, that slides open upwards.
-                    AnimatedVisibility(
-                        visible = fabOpen,
-                        enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
-                        exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut(),
+                    // A card in the button's colour and width, joined to it. The rounded top is drawn on the container,
+                    // so it stays round (and solid) while the icons slide open.
+                    Column(
+                        Modifier
+                            .width(56.dp)
+                            .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                            .background(MaterialTheme.colorScheme.primary),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-                            shadowElevation = 6.dp,
-                            modifier = Modifier.width(56.dp),
+                        AnimatedVisibility(
+                            visible = fabOpen,
+                            enter = expandVertically(expandFrom = Alignment.Bottom),
+                            exit = shrinkVertically(shrinkTowards = Alignment.Bottom),
                         ) {
                             Column(Modifier.padding(top = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                 CapsuleAction(Icons.Filled.CreateNewFolder, "پوشه‌ی جدید", {
@@ -684,7 +685,7 @@ private fun MainTopBar(
             IconButton(onClick = onSearch) { Icon(Icons.Filled.Search, "جستجو") }
             Box {
                 IconButton(onClick = { moreOpen = true }) { Icon(Icons.Filled.MoreVert, "بیشتر") }
-                DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
+                GlassMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
                     if (!atHome) {
                         DropdownMenuItem(
                             text = { Text(if (grid) "فهرستی کردن این پوشه" else "شبکه‌ای کردن این پوشه") },
@@ -1003,7 +1004,7 @@ private fun FolderContent(
                         }
                     },
                     state = gridState,
-                    contentPadding = LocalViewPrefs.current.itemGap.let { g -> PaddingValues(start = 8.dp * g, end = 8.dp * g, top = 4.dp * g, bottom = 120.dp) },
+                    contentPadding = LocalViewPrefs.current.itemGap.let { g -> PaddingValues(start = 13.dp, end = 13.dp, top = 4.dp * g, bottom = 120.dp) },
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     items(st.items, key = { it.path }) { f ->

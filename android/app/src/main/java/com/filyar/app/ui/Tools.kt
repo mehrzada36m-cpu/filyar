@@ -1,6 +1,8 @@
 package com.filyar.app.ui
 
 import android.net.Uri
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.material3.DropdownMenu
 import android.os.Looper
 import android.os.Handler
 import com.filyar.app.PlaybackService
@@ -287,6 +289,22 @@ fun Modifier.glassCapsule(shape: Shape, opacity: Float = 1f): Modifier {
         .clip(shape)
         .background(Brush.verticalGradient(listOf(scheme.surfaceContainerHigh.copy(alpha = 0.92f * opacity), scheme.surfaceContainer.copy(alpha = 0.80f * opacity))))
         .border(1.dp, rim, shape)
+}
+
+/** Dropdown menu in the same frosted style as the long-press capsule: same corners, colour and transparency. */
+@Composable
+fun GlassMenu(expanded: Boolean, onDismissRequest: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    val shape = RoundedCornerShape(28.dp)
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismissRequest,
+        modifier = Modifier.glassCapsule(shape),
+        shape = shape,
+        containerColor = Color.Transparent,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        content = content,
+    )
 }
 
 /** The audio that plays in the mini player. It lives in the ViewModel, so music keeps playing across screens. */
