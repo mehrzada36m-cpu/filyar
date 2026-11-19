@@ -551,9 +551,9 @@ fun MiniPlayerBar(vm: BrowserViewModel, beforeOpen: () -> Unit = {}) {
 }
 
 /**
- * The large player that opens at the bottom of the screen while you browse inside a folder: a glass capsule
- * with a big round play button, artist and title, a red progress line and the time. White in the light theme,
- * warm dark grey in the dark theme.
+ * The large glass player that floats at the bottom of the folder the music is playing from: a stadium capsule
+ * with a big round button (with a bevelled ring), artist and title, a red progress line and the time. White glass
+ * in the light theme, warm dark grey glass in the dark theme, so the folders show through behind it.
  */
 @Composable
 fun MiniPlayerBottom(vm: BrowserViewModel) {
@@ -569,18 +569,18 @@ fun MiniPlayerBottom(vm: BrowserViewModel) {
     }
 
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val shape = RoundedCornerShape(40.dp)
+    val shape = RoundedCornerShape(50)
     val body = if (dark) {
-        Brush.verticalGradient(listOf(Color(0xFF5A5450).copy(alpha = 0.92f), Color(0xFF3C3735).copy(alpha = 0.86f)))
+        Brush.verticalGradient(listOf(Color(0xFF5A5450).copy(alpha = 0.74f), Color(0xFF3C3735).copy(alpha = 0.62f)))
     } else {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.95f), Color(0xFFF1F3F6).copy(alpha = 0.85f)))
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.66f), Color.White.copy(alpha = 0.48f)))
     }
     val rim = Brush.linearGradient(
-        listOf(Color.White.copy(alpha = if (dark) 0.35f else 1f), Color.White.copy(alpha = if (dark) 0.05f else 0.45f)),
+        listOf(Color.White.copy(alpha = if (dark) 0.40f else 1f), Color.White.copy(alpha = if (dark) 0.06f else 0.45f)),
     )
     val ink = if (dark) Color(0xFFF4F1EE) else Color(0xFF1C1B1A)
-    val sub = if (dark) Color(0xFFB9B1AB) else Color(0xFF7A7570)
-    val track = if (dark) Color.White.copy(alpha = 0.85f) else Color(0xFFD9DCE1)
+    val sub = if (dark) Color(0xFFB9B1AB) else Color(0xFF6F6A66)
+    val track = if (dark) Color.White.copy(alpha = 0.85f) else Color(0xFFD3D6DB)
     val red = Color(0xFFD9504B)
     val clean = f.name.substringBeforeLast('.').replace('_', ' ').trim()
     val parts = clean.split(" - ", limit = 2)
@@ -593,18 +593,21 @@ fun MiniPlayerBottom(vm: BrowserViewModel) {
             Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 13.dp, vertical = 8.dp)
+                .padding(horizontal = 13.dp, vertical = 12.dp)
                 .clip(shape)
                 .background(body)
                 .border(1.dp, rim, shape),
         ) {
-            Row(Modifier.padding(start = 12.dp, end = 8.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.padding(start = 10.dp, end = 18.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                // The big button: a bevelled ring around a red dome.
                 Box(
                     Modifier
-                        .size(58.dp)
+                        .size(64.dp)
                         .clip(CircleShape)
-                        .background(Brush.verticalGradient(listOf(Color(0xFFE5706B), Color(0xFFC2403D))))
-                        .border(2.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.5f), Color.Black.copy(alpha = 0.15f))), CircleShape)
+                        .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.55f), Color.Black.copy(alpha = 0.22f))))
+                        .padding(4.dp)
+                        .clip(CircleShape)
+                        .background(Brush.radialGradient(listOf(Color(0xFFF0827C), Color(0xFFC9423E))))
                         .clickable { audio.toggle() },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -612,7 +615,7 @@ fun MiniPlayerBottom(vm: BrowserViewModel) {
                         if (audio.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                         if (audio.playing) "توقف" else "پخش",
                         tint = Color.White,
-                        modifier = Modifier.size(32.dp),
+                        modifier = Modifier.size(30.dp),
                     )
                 }
                 Spacer(Modifier.width(14.dp))
@@ -622,7 +625,7 @@ fun MiniPlayerBottom(vm: BrowserViewModel) {
                     Box(
                         Modifier
                             .fillMaxWidth()
-                            .height(16.dp)
+                            .height(14.dp)
                             .pointerInput(audio.ready, audio.duration) {
                                 detectTapGestures { o -> audio.seekFraction(o.x / size.width) }
                             }
@@ -641,8 +644,8 @@ fun MiniPlayerBottom(vm: BrowserViewModel) {
                             },
                         contentAlignment = Alignment.CenterStart,
                     ) {
-                        Box(Modifier.fillMaxWidth().height(5.dp).clip(CircleShape).background(track))
-                        Box(Modifier.fillMaxWidth(shown).height(5.dp).clip(CircleShape).background(red))
+                        Box(Modifier.fillMaxWidth().height(6.dp).clip(CircleShape).background(track))
+                        Box(Modifier.fillMaxWidth(shown).height(6.dp).clip(CircleShape).background(red))
                     }
                     Text(
                         "${clock(if (dragging) (dragValue * audio.duration).toInt() else audio.position)} / ${clock(audio.duration)}",
@@ -651,7 +654,8 @@ fun MiniPlayerBottom(vm: BrowserViewModel) {
                         maxLines = 1,
                     )
                 }
-                IconButton(onClick = { audio.close() }, modifier = Modifier.size(32.dp).align(Alignment.Top)) {
+                Spacer(Modifier.width(6.dp))
+                IconButton(onClick = { audio.close() }, modifier = Modifier.size(30.dp)) {
                     Icon(Icons.Filled.Close, "بستن پخش‌کننده", tint = sub, modifier = Modifier.size(20.dp))
                 }
             }

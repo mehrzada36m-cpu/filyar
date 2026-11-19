@@ -184,7 +184,7 @@ private fun FolderTile(f: MediaFolderInfo, vm: BrowserViewModel, onClick: () -> 
     ) {
         // The newest file stands in as the folder's preview.
         if (LocalViewPrefs.current.homeStyle == HomeStyle.Glass) {
-            GlassFolderIcon(64.dp, f.path.hashCode() and 1, peek = { FilePreview(f.newest, vm.backend, 40.dp) })
+            GlassFolderWithFile(64.dp, f.path.hashCode() and 1, f.newest, vm.backend)
         } else {
             FileIcon(f.newest, vm.backend, 64.dp, selected = false)
         }

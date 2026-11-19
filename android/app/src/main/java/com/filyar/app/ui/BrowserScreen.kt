@@ -268,6 +268,8 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
     }
 
     val glassHome = vp.homeStyle == HomeStyle.Glass && st.path == null && !searching
+    // The big player shows only in the folder the music is playing from; everywhere else the slim pill is used.
+    val playerHere = st.path != null && vm.audio.file?.parent == st.path
     val inFolders = st.path != null || searching
     val hasBackdrop = homeBg != null || vp.homeStyle == HomeStyle.Glass || vp.bgBlur > 0
     // Only on the home screen, unless the user also wants it behind storage and folders.
@@ -311,7 +313,7 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
                     onShizuku = shizukuAction,
                 )
             }
-                    if (st.path == null) MiniPlayerBar(vm)
+                    if (!playerHere) MiniPlayerBar(vm)
         }
     },
         bottomBar = {
@@ -324,8 +326,6 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
                         onCancel = vm::clearClip,
                     )
                 }
-                // Inside a folder the player opens down here (the slim pill is for the other screens).
-                if (st.path != null && !selecting) MiniPlayerBottom(vm)
             }
         },
         floatingActionButton = {
@@ -334,7 +334,7 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
             AnimatedVisibility(!selecting && !searching && st.path != null && clip == null, enter = scaleIn(), exit = scaleOut()) {
                 // Extra margin: 48dp from the bottom and 32dp from the side (the default is 16dp).
                 Column(
-                    Modifier.padding(start = 16.dp, end = 16.dp, bottom = 32.dp),
+                    Modifier.padding(start = 16.dp, end = 16.dp, bottom = if (playerHere && !selecting) 124.dp else 32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     // A card in the button's colour and width, joined to it. The rounded top is drawn on the container,
@@ -431,6 +431,9 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
             }
         }
     }
+        if (playerHere && !selecting) {
+            Box(Modifier.align(Alignment.BottomCenter)) { MiniPlayerBottom(vm) }
+        }
         // The selection capsule floats over the list, so nothing around it is hidden.
         if (selecting) {
             Box(Modifier.align(Alignment.BottomCenter)) {

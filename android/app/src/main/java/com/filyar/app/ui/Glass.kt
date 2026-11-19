@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -37,9 +38,17 @@ import androidx.compose.ui.unit.dp
  * front panel with a bright rim. Variant 0 is blue, variant 1 is cyan.
  */
 @Composable
-fun GlassFolderIcon(size: Dp, variant: Int, modifier: Modifier = Modifier, peek: (@Composable () -> Unit)? = null) {
-    val deep = if (variant == 0) Color(0xFF5B7CF0) else Color(0xFF27BFD6)
-    val light = if (variant == 0) Color(0xFF93AAFF) else Color(0xFF86E6F1)
+fun GlassFolderIcon(
+    size: Dp,
+    variant: Int,
+    modifier: Modifier = Modifier,
+    tint: Color? = null,
+    peek: (@Composable () -> Unit)? = null,
+    panel: (@Composable () -> Unit)? = null,
+) {
+    // A colour chosen for this folder wins over the blue/cyan pair.
+    val deep = tint ?: if (variant == 0) Color(0xFF5B7CF0) else Color(0xFF27BFD6)
+    val light = if (tint != null) lerp(tint, Color.White, 0.42f) else if (variant == 0) Color(0xFF93AAFF) else Color(0xFF86E6F1)
     Box(modifier.size(size)) {
         Canvas(Modifier.fillMaxSize()) {
             val w = this.size.width
@@ -92,6 +101,8 @@ fun GlassFolderIcon(size: Dp, variant: Int, modifier: Modifier = Modifier, peek:
                 style = Stroke(width = 0.018f * w),
             )
         }
+        // An icon sits low, on the front panel (the folder part), not up in the card.
+        if (panel != null) Box(Modifier.align(Alignment.Center).offset(y = size * 0.19f)) { panel() }
     }
 }
 

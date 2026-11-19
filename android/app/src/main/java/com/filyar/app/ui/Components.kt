@@ -115,6 +115,50 @@ object FolderPeek {
 @Composable
 fun FilePreview(f: RemoteFile, backend: FileBackend, size: Dp) = FileGlyph(f, backend, size)
 
+/**
+ * The card that peeks out of a glass folder: the file's thumbnail when it has one. When it has none, [onPlain]
+ * is told the file's kind so the folder can show a plain icon low on its front panel instead.
+ */
+@Composable
+fun FilePeek(f: RemoteFile, backend: FileBackend, size: Dp, onPlain: (FileKind?) -> Unit) {
+    val kind = kindOf(f)
+    val context = LocalContext.current
+    val previews = LocalViewPrefs.current.previews
+    val px = Thumbnails.bucket(with(LocalDensity.current) { (size.roundToPx() * 1.5f).toInt() })
+    var thumb by remember(f.path, f.lastModified, previews, px) {
+        mutableStateOf(if (previews) Thumbnails.cached(f, px)?.asImageBitmap() else null)
+    }
+    if (previews && thumb == null && Thumbnails.supports(f)) {
+        LaunchedEffect(f.path, f.lastModified, px) {
+            thumb = Thumbnails.load(context, backend, f, px)?.asImageBitmap()
+        }
+    }
+    LaunchedEffect(thumb == null, f.path) { onPlain(if (thumb == null) kind else null) }
+    val t = thumb
+    if (t != null) Image(t, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+}
+
+/** A glass folder showing [file] (its newest file) as a card, or as a low icon when it has no thumbnail. */
+@Composable
+fun GlassFolderWithFile(
+    size: Dp,
+    variant: Int,
+    file: RemoteFile?,
+    backend: FileBackend?,
+    modifier: Modifier = Modifier,
+    tint: Color? = null,
+    showPanelIcon: Boolean = true,
+) {
+    var plain by remember(file?.path) { mutableStateOf<FileKind?>(null) }
+    val iconColor = if (tint == null && variant == 1) Color(0xFF0A4F66) else Color.White
+    val peek: (@Composable () -> Unit)? =
+        if (file != null && backend != null && size >= 40.dp) ({ FilePeek(file, backend, size * 0.62f) { plain = it } }) else null
+    val kind = plain
+    val panel: (@Composable () -> Unit)? =
+        if (showPanelIcon && kind != null) ({ Icon(kind.icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(size * 0.30f)) }) else null
+    GlassFolderIcon(size, variant, modifier, tint = tint, peek = peek, panel = panel)
+}
+
 val ItemSize.rowIcon: Dp
     get() = when (this) {
         ItemSize.Compact -> 38.dp
@@ -187,17 +231,15 @@ fun FolderGlyph(path: String, name: String, size: Dp, modifier: Modifier = Modif
             val newest by produceState<RemoteFile?>(FolderPeek.cached(path), path, backend) {
                 if (backend != null && !FolderPeek.has(path)) value = withContext(Dispatchers.IO) { FolderPeek.load(backend, path) }
             }
-            val shown = newest
-            val peek: (@Composable () -> Unit)? =
-                if (backend != null && shown != null && size >= 40.dp) ({ FilePreview(shown, backend, size * 0.62f) }) else null
-            GlassFolderIcon(size, variant, peek = peek)
+            val customTint = custom?.color?.let { FolderIcons.colorAt(it) }
             val hasOwnIcon = customIcon != null || builtin != null || (a == null && appIcons && FolderIcons.appFallbackFor(name) != null)
+            GlassFolderWithFile(size, variant, newest, backend, tint = customTint, showPanelIcon = !hasOwnIcon)
             if (hasOwnIcon) {
                 Icon(
                     icon,
                     contentDescription = null,
-                    tint = if (variant == 0) Color.White else Color(0xFF0A4F66),
-                    modifier = Modifier.align(Alignment.Center).offset(y = size * 0.07f).size(size * 0.34f),
+                    tint = if (customTint == null && variant == 1) Color(0xFF0A4F66) else Color.White,
+                    modifier = Modifier.align(Alignment.Center).offset(y = size * 0.19f).size(size * 0.30f),
                 )
             }
         } else {

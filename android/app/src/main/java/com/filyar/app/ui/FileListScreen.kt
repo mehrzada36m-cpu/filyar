@@ -50,11 +50,13 @@ fun FileListScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
     val state = current ?: return
     BackHandler { vm.closeListing() }
     val groups = state.groups
+    val audioNow = vm.audio.file
+    val playerHere = audioNow != null && state.files.any { it.path == audioNow.path }
 
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
-        bottomBar = { MiniPlayerBottom(vm) },
         topBar = {
         Column {
             TopAppBar(
@@ -75,7 +77,8 @@ fun FileListScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                     }
                 },
             )
-                }
+                    if (!playerHere) MiniPlayerBar(vm)
+        }
     },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
@@ -94,6 +97,10 @@ fun FileListScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
                     }
                 }
             }
+        }
+    }
+        if (playerHere) {
+            Box(Modifier.align(Alignment.BottomCenter)) { MiniPlayerBottom(vm) }
         }
     }
 }
