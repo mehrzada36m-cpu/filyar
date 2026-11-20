@@ -460,7 +460,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
                     FileOps.copy(b, item, dest, p)
                 }
             }
-            if (clip.cut) _clip.value = null
+            _clip.value = null
             if (clip.cut) "انتقال انجام شد" else "کپی انجام شد"
         }
     }

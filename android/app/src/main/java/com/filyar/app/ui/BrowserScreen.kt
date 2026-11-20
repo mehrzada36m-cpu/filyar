@@ -334,7 +334,7 @@ fun BrowserScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onOpenSetti
             AnimatedVisibility(!selecting && !searching && st.path != null && clip == null, enter = scaleIn(), exit = scaleOut()) {
                 // Extra margin: 48dp from the bottom and 32dp from the side (the default is 16dp).
                 Column(
-                    Modifier.padding(start = 16.dp, end = 16.dp, bottom = if (playerHere && !selecting) 124.dp else 32.dp),
+                    Modifier.padding(start = 16.dp, end = 16.dp, bottom = if (playerHere && !selecting) 110.dp else 32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     // A card in the button's colour and width, joined to it. The rounded top is drawn on the container,

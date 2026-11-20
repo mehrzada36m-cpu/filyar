@@ -30,6 +30,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import kotlinx.coroutines.delay
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.clip
 import androidx.compose.material3.Slider
@@ -472,11 +473,6 @@ fun MiniPlayerBar(vm: BrowserViewModel, beforeOpen: () -> Unit = {}) {
     val ink = scheme.onSurface
     val gray = scheme.onSurfaceVariant
     val shown = (if (dragging) dragValue else if (audio.duration > 0) audio.position.toFloat() / audio.duration else 0f).coerceIn(0f, 1f)
-    val speedLabel = when (audio.speed) {
-        1f -> "1X"
-        1.5f -> "1.5X"
-        else -> "2X"
-    }
     // Telegram lays this pill out left to right, whatever the app's language.
     CompositionLocalProvider(LocalContentColor provides ink, LocalLayoutDirection provides LayoutDirection.Ltr) {
         Box(
@@ -508,13 +504,6 @@ fun MiniPlayerBar(vm: BrowserViewModel, beforeOpen: () -> Unit = {}) {
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(5.dp))
-                        .border(1.5.dp, gray, RoundedCornerShape(5.dp))
-                        .clickable { audio.cycleSpeed() }
-                        .padding(horizontal = 5.dp, vertical = 1.dp),
-                ) { Text(speedLabel, color = gray, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1) }
                 Spacer(Modifier.width(8.dp))
                 IconButton(onClick = { audio.close() }, modifier = Modifier.size(32.dp)) {
                     Icon(Icons.Filled.Close, "بستن پخش‌کننده", tint = ink.copy(alpha = 0.75f), modifier = Modifier.size(22.dp))
@@ -571,9 +560,9 @@ fun MiniPlayerBottom(vm: BrowserViewModel) {
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val shape = RoundedCornerShape(50)
     val body = if (dark) {
-        Brush.verticalGradient(listOf(Color(0xFF5A5450).copy(alpha = 0.74f), Color(0xFF3C3735).copy(alpha = 0.62f)))
+        Brush.verticalGradient(listOf(Color(0xFF5A5450).copy(alpha = 0.96f), Color(0xFF3C3735).copy(alpha = 0.81f)))
     } else {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.66f), Color.White.copy(alpha = 0.48f)))
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.86f), Color.White.copy(alpha = 0.62f)))
     }
     val rim = Brush.linearGradient(
         listOf(Color.White.copy(alpha = if (dark) 0.40f else 1f), Color.White.copy(alpha = if (dark) 0.06f else 0.45f)),
@@ -581,7 +570,8 @@ fun MiniPlayerBottom(vm: BrowserViewModel) {
     val ink = if (dark) Color(0xFFF4F1EE) else Color(0xFF1C1B1A)
     val sub = if (dark) Color(0xFFB9B1AB) else Color(0xFF6F6A66)
     val track = if (dark) Color.White.copy(alpha = 0.85f) else Color(0xFFD3D6DB)
-    val red = Color(0xFFD9504B)
+    val accent = MaterialTheme.colorScheme.primary
+    val onAccent = MaterialTheme.colorScheme.onPrimary
     val clean = f.name.substringBeforeLast('.').replace('_', ' ').trim()
     val parts = clean.split(" - ", limit = 2)
     val artist = if (parts.size == 2) parts[0].trim() else f.parent.substringAfterLast('/')
@@ -598,34 +588,49 @@ fun MiniPlayerBottom(vm: BrowserViewModel) {
                 .background(body)
                 .border(1.dp, rim, shape),
         ) {
-            Row(Modifier.padding(start = 10.dp, end = 18.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.padding(start = 8.dp, end = 16.dp, top = 7.dp, bottom = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                 // The big button: a bevelled ring around a red dome.
                 Box(
                     Modifier
-                        .size(64.dp)
+                        .size(52.dp)
                         .clip(CircleShape)
                         .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.55f), Color.Black.copy(alpha = 0.22f))))
-                        .padding(4.dp)
+                        .padding(3.dp)
                         .clip(CircleShape)
-                        .background(Brush.radialGradient(listOf(Color(0xFFF0827C), Color(0xFFC9423E))))
+                        .background(Brush.radialGradient(listOf(lerp(accent, Color.White, 0.25f), lerp(accent, Color.Black, 0.18f))))
                         .clickable { audio.toggle() },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         if (audio.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                         if (audio.playing) "توقف" else "پخش",
-                        tint = Color.White,
-                        modifier = Modifier.size(30.dp),
+                        tint = onAccent,
+                        modifier = Modifier.size(26.dp),
                     )
                 }
-                Spacer(Modifier.width(14.dp))
+                Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(if (audio.failed) "پخش ممکن نشد" else artist, color = sub, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(title, color = ink, fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            if (audio.failed) "پخش ممکن نشد" else artist,
+                            color = sub,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            "${clock(if (dragging) (dragValue * audio.duration).toInt() else audio.position)} / ${clock(audio.duration)}",
+                            color = sub,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                        )
+                    }
+                    Text(title, color = ink, fontSize = 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Box(
                         Modifier
                             .fillMaxWidth()
-                            .height(14.dp)
+                            .height(12.dp)
                             .pointerInput(audio.ready, audio.duration) {
                                 detectTapGestures { o -> audio.seekFraction(o.x / size.width) }
                             }
@@ -644,15 +649,9 @@ fun MiniPlayerBottom(vm: BrowserViewModel) {
                             },
                         contentAlignment = Alignment.CenterStart,
                     ) {
-                        Box(Modifier.fillMaxWidth().height(6.dp).clip(CircleShape).background(track))
-                        Box(Modifier.fillMaxWidth(shown).height(6.dp).clip(CircleShape).background(red))
+                        Box(Modifier.fillMaxWidth().height(5.dp).clip(CircleShape).background(track))
+                        Box(Modifier.fillMaxWidth(shown).height(5.dp).clip(CircleShape).background(accent))
                     }
-                    Text(
-                        "${clock(if (dragging) (dragValue * audio.duration).toInt() else audio.position)} / ${clock(audio.duration)}",
-                        color = sub,
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                    )
                 }
                 Spacer(Modifier.width(6.dp))
                 IconButton(onClick = { audio.close() }, modifier = Modifier.size(30.dp)) {
