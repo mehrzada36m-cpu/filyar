@@ -100,6 +100,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        AutoClose.visible = true
+        AutoClose.cancel(this)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        AutoClose.visible = false
+        if (!isChangingConfigurations) AutoClose.schedule(this)
+    }
+
     override fun onResume() {
         super.onResume()
         vm.onResume()

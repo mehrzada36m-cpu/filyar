@@ -107,6 +107,66 @@ fun GlassFolderIcon(
 }
 
 /**
+ * The "pocket" folder: a rounded tile in the folder colour, the newest file peeking out of it as a slightly turned
+ * card, and a frosted pocket across the lower part.
+ */
+@Composable
+fun PocketFolderIcon(
+    size: Dp,
+    tint: Color,
+    modifier: Modifier = Modifier,
+    peek: (@Composable () -> Unit)? = null,
+    panel: (@Composable () -> Unit)? = null,
+) {
+    val light = lerp(tint, Color.White, 0.30f)
+    val tile = RoundedCornerShape(size * 0.24f)
+    Box(modifier.size(size).clip(tile).background(Brush.verticalGradient(listOf(light, tint)))) {
+        if (peek != null) {
+            // a plain card behind, then the newest file in front, each turned a little
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(x = size * 0.11f, y = size * 0.14f)
+                    .size(size * 0.40f)
+                    .graphicsLayer { rotationZ = 7f }
+                    .clip(RoundedCornerShape(size * 0.05f))
+                    .background(Color.White.copy(alpha = 0.85f)),
+            )
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(x = -size * 0.08f, y = size * 0.12f)
+                    .size(size * 0.46f)
+                    .graphicsLayer { rotationZ = -6f }
+                    .clip(RoundedCornerShape(size * 0.05f))
+                    .background(Color.White),
+            ) { peek() }
+        }
+        Canvas(Modifier.fillMaxSize()) {
+            val w = this.size.width
+            val h = this.size.height
+            val top = Offset(0f, 0.54f * h)
+            val pocket = Size(w, 0.70f * h)
+            val corner = CornerRadius(0.09f * w)
+            drawRoundRect(
+                brush = Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.34f), Color.White.copy(alpha = 0.16f)), startY = 0.54f * h, endY = h),
+                topLeft = top,
+                size = pocket,
+                cornerRadius = corner,
+            )
+            drawRoundRect(
+                brush = Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.60f), Color.White.copy(alpha = 0.05f)), startY = 0.54f * h, endY = 0.70f * h),
+                topLeft = top,
+                size = pocket,
+                cornerRadius = corner,
+                style = Stroke(width = 0.016f * w),
+            )
+        }
+        if (panel != null) Box(Modifier.align(Alignment.Center).offset(y = size * 0.25f)) { panel() }
+    }
+}
+
+/**
  * Backdrop of the home screen: the chosen picture, or (in colour mode) the app colour with soft colour
  * glows. [blurPct] (0–100) sets how blurred it is; blurring needs Android 12 or newer.
  */

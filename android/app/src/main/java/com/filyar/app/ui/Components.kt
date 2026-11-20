@@ -52,6 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import com.filyar.app.core.FolderStyle
 import com.filyar.app.core.HomeStyle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -148,6 +149,7 @@ fun GlassFolderWithFile(
     modifier: Modifier = Modifier,
     tint: Color? = null,
     showPanelIcon: Boolean = true,
+    pocket: Boolean = false,
 ) {
     var plain by remember(file?.path) { mutableStateOf<FileKind?>(null) }
     val iconColor = if (tint == null && variant == 1) Color(0xFF0A4F66) else Color.White
@@ -156,7 +158,11 @@ fun GlassFolderWithFile(
     val kind = plain
     val panel: (@Composable () -> Unit)? =
         if (showPanelIcon && kind != null) ({ Icon(kind.icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(size * 0.30f)) }) else null
-    GlassFolderIcon(size, variant, modifier, tint = tint, peek = peek, panel = panel)
+    if (pocket) {
+        PocketFolderIcon(size, tint ?: if (variant == 0) Color(0xFF2F55D8) else Color(0xFF14A9C4), modifier, peek = peek, panel = panel)
+    } else {
+        GlassFolderIcon(size, variant, modifier, tint = tint, peek = peek, panel = panel)
+    }
 }
 
 val ItemSize.rowIcon: Dp
@@ -223,7 +229,8 @@ fun FolderGlyph(path: String, name: String, size: Dp, modifier: Modifier = Modif
         ?: Icons.Filled.Folder
     val model = custom?.model ?: prefs.folderModel
     val plain = model == FolderModel.Plain
-    val glass = prefs.homeStyle == HomeStyle.Glass
+    val pocket = prefs.folderStyle == FolderStyle.Pocket
+    val glass = prefs.homeStyle == HomeStyle.Glass || pocket
     Box(modifier.size(size)) {
         if (glass) {
             val variant = path.hashCode() and 1
@@ -233,13 +240,13 @@ fun FolderGlyph(path: String, name: String, size: Dp, modifier: Modifier = Modif
             }
             val customTint = custom?.color?.let { FolderIcons.colorAt(it) }
             val hasOwnIcon = customIcon != null || builtin != null || (a == null && appIcons && FolderIcons.appFallbackFor(name) != null)
-            GlassFolderWithFile(size, variant, newest, backend, tint = customTint, showPanelIcon = !hasOwnIcon)
+            GlassFolderWithFile(size, variant, newest, backend, tint = customTint, showPanelIcon = !hasOwnIcon, pocket = pocket)
             if (hasOwnIcon) {
                 Icon(
                     icon,
                     contentDescription = null,
                     tint = if (customTint == null && variant == 1) Color(0xFF0A4F66) else Color.White,
-                    modifier = Modifier.align(Alignment.Center).offset(y = size * 0.19f).size(size * 0.30f),
+                    modifier = Modifier.align(Alignment.Center).offset(y = size * (if (pocket) 0.25f else 0.19f)).size(size * 0.30f),
                 )
             }
         } else {
@@ -254,9 +261,7 @@ fun FolderGlyph(path: String, name: String, size: Dp, modifier: Modifier = Modif
                     .align(Alignment.BottomEnd)
                     .offset(size * 0.05f, size * 0.05f)
                     .size(size * 0.44f)
-                    .clip(badge)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(size * 0.03f),
+                    .clip(badge),
             ) {
                 Image(a, contentDescription = null, modifier = Modifier.fillMaxSize().clip(badge))
             }
