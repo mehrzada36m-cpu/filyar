@@ -18,7 +18,7 @@ enum class FolderModel { Tile, Circle, Plain, Outline }
 enum class HomeStyle { Cards, Classic, Glass }
 
 /** Folder icon look: the default one for the theme, or the "pocket" tile with the newest file peeking out. */
-enum class FolderStyle { Default, Pocket }
+enum class FolderLook { Default, Pocket }
 
 data class ViewPrefs(
     val sort: SortBy = SortBy.Name,
@@ -36,7 +36,7 @@ data class ViewPrefs(
     val accent: Int = -1,
     val folderModel: FolderModel = FolderModel.Tile,
     val homeStyle: HomeStyle = HomeStyle.Cards,
-    val folderStyle: FolderStyle = FolderStyle.Default,
+    val folderLook: FolderLook = FolderLook.Default,
     /** Extra scaling on top of [itemSize]: 1f is the preset's own size. */
     val fileScale: Float = 1f,
     val folderScale: Float = 1f,
@@ -83,7 +83,7 @@ class Prefs(context: Context) {
             accent = sp.getInt("accent", -1),
             folderModel = enumPref("folderModel", FolderModel.Tile),
             homeStyle = enumPref("homeStyle", HomeStyle.Cards),
-            folderStyle = enumPref("folderStyle", FolderStyle.Default),
+            folderLook = enumPref("folderLook", FolderLook.Default),
             fileScale = sp.getFloat("fileScale", 1f).coerceIn(0.6f, 1.8f),
             folderScale = sp.getFloat("folderScale", 1f).coerceIn(0.6f, 1.8f),
             quickScale = sp.getFloat("quickScale", 1f).coerceIn(0.6f, 1.8f),
@@ -127,7 +127,7 @@ class Prefs(context: Context) {
             .putInt("accent", v.accent)
             .putString("folderModel", v.folderModel.name)
             .putString("homeStyle", v.homeStyle.name)
-            .putString("folderStyle", v.folderStyle.name)
+            .putString("folderLook", v.folderLook.name)
             .putFloat("fileScale", v.fileScale)
             .putFloat("folderScale", v.folderScale)
             .putFloat("quickScale", v.quickScale)

@@ -8,7 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.material3.Slider
-import com.filyar.app.core.FolderStyle
+import com.filyar.app.core.FolderLook
 import com.filyar.app.core.HomeStyle
 import com.filyar.app.ui.theme.Filyar
 import com.filyar.app.ui.theme.AccentColors
@@ -143,9 +143,9 @@ fun SettingsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onBack: ()
             ScaleSlider("اندازه‌ی آیکون پوشه‌ها", vp.folderScale) { v -> vm.updateView { it.copy(folderScale = v) } }
             Label("سبک آیکن پوشه")
             Chips(
-                options = listOf(FolderStyle.Default to "پیش‌فرض", FolderStyle.Pocket to "قابی (جیبی)"),
-                selected = vp.folderStyle,
-            ) { st -> vm.updateView { it.copy(folderStyle = st) } }
+                options = listOf(FolderLook.Default to "پیش‌فرض", FolderLook.Pocket to "قابی (جیبی)"),
+                selected = vp.folderLook,
+            ) { look -> vm.updateView { it.copy(folderLook = look) } }
             ScaleSlider("اندازه‌ی پوشه‌های دسترسی سریع", vp.quickScale) { v -> vm.updateView { it.copy(quickScale = v) } }
             ScaleSlider("فاصله‌ی بین آیتم‌ها", vp.itemGap, range = 0f..1.6f, steps = 7) { v -> vm.updateView { it.copy(itemGap = v) } }
             Label("تعداد ستون‌ها در نمای شبکه‌ای")

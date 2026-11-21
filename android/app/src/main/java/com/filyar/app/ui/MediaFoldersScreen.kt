@@ -57,7 +57,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import com.filyar.app.core.FolderStyle
+import com.filyar.app.core.FolderLook
 import com.filyar.app.core.HomeStyle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -184,7 +184,7 @@ private fun FolderTile(f: MediaFolderInfo, vm: BrowserViewModel, onClick: () -> 
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // The newest file stands in as the folder's preview.
-        val pocketStyle = LocalViewPrefs.current.folderStyle == FolderStyle.Pocket
+        val pocketStyle = LocalViewPrefs.current.folderLook == FolderLook.Pocket
         if (LocalViewPrefs.current.homeStyle == HomeStyle.Glass || pocketStyle) {
             GlassFolderWithFile(64.dp, f.path.hashCode() and 1, f.newest, vm.backend, pocket = pocketStyle)
         } else {

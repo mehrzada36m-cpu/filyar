@@ -52,7 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
-import com.filyar.app.core.FolderStyle
+import com.filyar.app.core.FolderLook
 import com.filyar.app.core.HomeStyle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -229,7 +229,7 @@ fun FolderGlyph(path: String, name: String, size: Dp, modifier: Modifier = Modif
         ?: Icons.Filled.Folder
     val model = custom?.model ?: prefs.folderModel
     val plain = model == FolderModel.Plain
-    val pocket = prefs.folderStyle == FolderStyle.Pocket
+    val pocket = prefs.folderLook == FolderLook.Pocket
     val glass = prefs.homeStyle == HomeStyle.Glass || pocket
     Box(modifier.size(size)) {
         if (glass) {
