@@ -7,6 +7,7 @@ import com.filyar.app.core.faNum
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.material3.Slider
 import com.filyar.app.core.FolderLook
 import com.filyar.app.core.HomeStyle
