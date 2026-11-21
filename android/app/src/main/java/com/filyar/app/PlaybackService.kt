@@ -53,11 +53,13 @@ class PlaybackService : Service() {
             ACTION_PREV -> audio.previous()
             ACTION_CLOSE -> audio.close()
         }
-        val card = build(audio)
-        if (Build.VERSION.SDK_INT >= 29) {
-            startForeground(ID, card, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-        } else {
-            startForeground(ID, card)
+        runCatching {
+            val card = build(audio)
+            if (Build.VERSION.SDK_INT >= 29) {
+                startForeground(ID, card, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            } else {
+                startForeground(ID, card)
+            }
         }
         if (audio.file == null) {
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -72,7 +74,7 @@ class PlaybackService : Service() {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         } else {
-            manager.notify(ID, build(audio))
+            runCatching { manager.notify(ID, build(audio)) }
         }
     }
 

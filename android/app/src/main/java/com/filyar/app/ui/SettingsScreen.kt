@@ -121,6 +121,36 @@ fun SettingsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onBack: ()
             SwitchRow("پس‌زمینه در حافظه و پوشه‌ها", "تصویر یا رنگ زمینه‌ی صفحه‌ی اصلی داخل حافظه‌ی داخلی و پوشه‌ها هم دیده شود", vp.bgEverywhere) { v ->
                 vm.updateView { it.copy(bgEverywhere = v) }
             }
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            val uiPrefs = remember { ctx.getSharedPreferences("filyar_ui", android.content.Context.MODE_PRIVATE) }
+            var autoMin by remember { mutableStateOf(uiPrefs.getInt("autoCloseMin", 3)) }
+            Label("بستن خودکار برنامه بعد از خروج")
+            Chips(
+                options = listOf(0 to "هرگز", 3 to "۳ دقیقه", 10 to "۱۰ دقیقه", 30 to "۳۰ دقیقه"),
+                selected = autoMin,
+            ) { m ->
+                autoMin = m
+                uiPrefs.edit().putInt("autoCloseMin", m).apply()
+            }
+            OutlinedButton(
+                onClick = {
+                    ctx.startActivity(
+                        android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                },
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+            ) { Text("بهینه‌سازی باتری برنامه") }
+            Label("گزارش بسته شدن ناگهانی")
+            var report by remember { mutableStateOf(readReport(ctx)) }
+            Text(report, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+            OutlinedButton(
+                onClick = {
+                    clearReport(ctx)
+                    report = readReport(ctx)
+                },
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+            ) { Text("پاک کردن گزارش") }
             val dynamicOn = vp.dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
             Label(if (dynamicOn) "رنگ اصلی (با رنگ پویا خاموش می‌شود)" else "رنگ اصلی")
             AccentPicker(selected = vp.accent, enabled = !dynamicOn) { a -> vm.updateView { it.copy(accent = a) } }
@@ -411,4 +441,19 @@ private fun BackgroundPicker(selected: Int, onSelect: (Int) -> Unit) {
             }
         }
     }
+}
+
+private fun readReport(ctx: android.content.Context): String {
+    val crash = java.io.File(ctx.filesDir, "last_crash.txt").takeIf { it.exists() }?.readText()?.take(1500)
+    val closed = java.io.File(ctx.filesDir, "last_autoclose.txt").takeIf { it.exists() }?.readText()
+    return buildString {
+        if (crash != null) append("خطای برنامه:\n").append(crash).append("\n\n")
+        if (closed != null) append("بستن خودکار توسط برنامه:\n").append(closed)
+        if (isEmpty()) append("هیچ خطا یا بستن خودکاری ثبت نشده است.")
+    }
+}
+
+private fun clearReport(ctx: android.content.Context) {
+    java.io.File(ctx.filesDir, "last_crash.txt").delete()
+    java.io.File(ctx.filesDir, "last_autoclose.txt").delete()
 }

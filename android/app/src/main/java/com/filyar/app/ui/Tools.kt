@@ -454,7 +454,7 @@ class MiniAudio private constructor(private val app: Context) {
                         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
                         var sample = 1
-                        while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 512) sample *= 2
+                        while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 256) sample *= 2
                         bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
                     }
                 } finally {

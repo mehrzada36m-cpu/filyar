@@ -324,8 +324,18 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
         val p = _state.value.path ?: return false
         if (p == homeAnchor || p == rootPath || !p.startsWith(rootPath)) {
             val back = if (p == homeAnchor) returnTo else null
-            navigate(null)
-            back?.invoke()
+            if (back != null) {
+                // Open the screen we return to first; the folder view is reset once it has faded out,
+                // so the home screen never shows in between.
+                returnTo = null
+                back.invoke()
+                viewModelScope.launch {
+                    delay(300)
+                    if (_state.value.path == p) navigate(null)
+                }
+            } else {
+                navigate(null)
+            }
         } else {
             navigate(parentPath(p))
         }
