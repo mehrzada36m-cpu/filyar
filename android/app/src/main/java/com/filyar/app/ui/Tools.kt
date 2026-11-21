@@ -1,6 +1,9 @@
 package com.filyar.app.ui
 
 import android.net.Uri
+import android.media.MediaMetadataRetriever
+import android.graphics.BitmapFactory
+import android.graphics.Bitmap
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.material3.DropdownMenu
@@ -322,8 +325,13 @@ class MiniAudio private constructor(private val app: Context) {
     /** Set by the playback service, so the notification follows every change. */
     var listener: (() -> Unit)? = null
 
-    /** Gives the track that follows [RemoteFile] (set by the ViewModel); null when it was the last. */
-    var nextProvider: ((RemoteFile) -> RemoteFile?)? = null
+    /** Gives the track [offset] places after (or before) a file, or null at the ends (set by the ViewModel). */
+    var neighbor: ((RemoteFile, Int) -> RemoteFile?)? = null
+
+    /** Cover art and tags of the current song, read from the file (for the notification card). */
+    @Volatile var art: Bitmap? = null
+    @Volatile var artistName: String? = null
+    @Volatile var trackTitle: String? = null
     private fun changed() { listener?.invoke() }
 
     var file by mutableStateOf<RemoteFile?>(null)
@@ -338,6 +346,9 @@ class MiniAudio private constructor(private val app: Context) {
     fun play(f: RemoteFile) {
         release()
         file = f
+        art = null
+        artistName = null
+        trackTitle = null
         ready = false
         playing = false
         failed = false
@@ -358,14 +369,14 @@ class MiniAudio private constructor(private val app: Context) {
             mp.setOnCompletionListener {
                 position = duration
                 val current = file
-                val provider = nextProvider
+                val provider = neighbor
                 if (current == null || provider == null) {
                     playing = false
                     changed()
                 } else {
                     // Look for the next song off the main thread, then start it.
                     Thread {
-                        val next = runCatching { provider(current) }.getOrNull()
+                        val next = runCatching { provider(current, 1) }.getOrNull()
                         Handler(Looper.getMainLooper()).post {
                             if (file?.path == current.path) {
                                 if (next != null) {
@@ -389,6 +400,7 @@ class MiniAudio private constructor(private val app: Context) {
         } catch (e: Exception) {
             failed = true
         }
+        loadMeta(f)
         // The service shows the media card in the notifications.
         runCatching { app.startForegroundService(Intent(app, PlaybackService::class.java)) }
         changed()
@@ -406,6 +418,58 @@ class MiniAudio private constructor(private val app: Context) {
             if (speed != 1f) applySpeed()
         }
         changed()
+    }
+
+    /** Plays the following (or, with a negative offset, the preceding) song of the folder. */
+    fun skip(offset: Int) {
+        val current = file ?: return
+        val provider = neighbor ?: return
+        Thread {
+            val target = runCatching { provider(current, offset) }.getOrNull()
+            Handler(Looper.getMainLooper()).post {
+                if (file?.path == current.path && target != null) play(target)
+            }
+        }.start()
+    }
+
+    fun next() = skip(1)
+
+    /** Like most players: after the first seconds, "previous" restarts the song instead of going back. */
+    fun previous() {
+        if (position > 3000) seekFraction(0f) else skip(-1)
+    }
+
+    private fun loadMeta(f: RemoteFile) {
+        Thread {
+            var bitmap: Bitmap? = null
+            var artist: String? = null
+            var title: String? = null
+            runCatching {
+                val reader = MediaMetadataRetriever()
+                try {
+                    reader.setDataSource(f.path)
+                    artist = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)?.takeIf { it.isNotBlank() }
+                    title = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)?.takeIf { it.isNotBlank() }
+                    reader.embeddedPicture?.let { bytes ->
+                        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+                        var sample = 1
+                        while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 512) sample *= 2
+                        bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
+                    }
+                } finally {
+                    reader.release()
+                }
+            }
+            Handler(Looper.getMainLooper()).post {
+                if (file?.path == f.path) {
+                    art = bitmap
+                    artistName = artist
+                    trackTitle = title
+                    changed()
+                }
+            }
+        }.start()
     }
 
     /** 1X, 1.5X and 2X, in turn. */

@@ -159,14 +159,8 @@ private fun AppRoot(vm: BrowserViewModel) {
 
     AnimatedContent(
         targetState = screen,
-        transitionSpec = {
-            if (targetState == Screen.Browser) {
-                // Coming back home: a plain, quick crossfade with no sliding.
-                fadeIn(tween(150)) togetherWith fadeOut(tween(150))
-            } else {
-                (fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 14 }) togetherWith fadeOut(tween(140))
-            }
-        },
+        // A plain, quick crossfade for every screen change: no sliding, so pages never bob up and down.
+        transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(150)) },
         label = "screen",
     ) { s ->
         when (s) {

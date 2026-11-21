@@ -1388,13 +1388,14 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     val audio = MiniAudio.get(getApplication<Application>())
 
     init {
-        // When a song ends, the next audio file in the same folder (natural name order) plays.
-        audio.nextProvider = { current ->
+        // The song before or after one (natural name order, same folder): used when a song ends and by next/previous.
+        audio.neighbor = { current, offset ->
             val songs = runCatching { backend.list(current.parent) }.getOrDefault(emptyList())
                 .filter { !it.isDirectory && kindOf(it) == FileKind.Audio }
                 .sortedWith { a, b -> NaturalOrder.compare(a.name, b.name) }
             val i = songs.indexOfFirst { it.path == current.path }
-            if (i >= 0 && i + 1 < songs.size) songs[i + 1] else null
+            val j = i + offset
+            if (i >= 0 && j in songs.indices) songs[j] else null
         }
     }
 

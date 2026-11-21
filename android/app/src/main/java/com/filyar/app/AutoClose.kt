@@ -39,8 +39,8 @@ object AutoClose {
 class CloseReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (AutoClose.visible) return
-        // Music is still playing: keep the app (and its notification) and look again later.
-        if (MiniAudio.get(context).playing) {
+        // A song is loaded (playing or paused) or the playback service is running: keep the app and look again later.
+        if (PlaybackService.running || MiniAudio.get(context).file != null) {
             AutoClose.schedule(context)
             return
         }
