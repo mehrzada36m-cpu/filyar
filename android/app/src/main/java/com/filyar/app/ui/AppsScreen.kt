@@ -76,10 +76,8 @@ fun AppsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState) {
     val all = apps.orEmpty()
     val userCount = all.count { !it.isSystem }
     val list = remember(apps, tab) {
-        when (tab) {
-            2 -> all.filter { it.isSystem }
-            else -> all.filter { !it.isSystem }
-        }
+        // System apps are not listed at all.
+        all.filter { !it.isSystem }
     }
 
     Scaffold(
@@ -196,7 +194,7 @@ private fun AppRow(e: AppEntry, vm: BrowserViewModel) {
 @Composable
 fun AppsCapsule(selected: Int, onSelect: (Int) -> Unit) {
     val scheme = MaterialTheme.colorScheme
-    val labels = listOf("فایل برنامه‌ها", "نصب‌شده‌ها", "سیستمی")
+    val labels = listOf("فایل برنامه‌ها", "نصب‌شده‌ها")
     Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
         Surface(
             shape = RoundedCornerShape(50),

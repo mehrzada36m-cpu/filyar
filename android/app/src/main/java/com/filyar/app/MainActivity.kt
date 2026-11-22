@@ -178,6 +178,36 @@ private fun AppRoot(vm: BrowserViewModel) {
 
     val apkPrompt by vm.apkPrompt.collectAsStateWithLifecycle()
     val zipPrompt by vm.zipPrompt.collectAsStateWithLifecycle()
+    // Once, ask the user to switch off Android's "pause app activity if unused", which can close the app.
+    val appCtx = androidx.compose.ui.platform.LocalContext.current
+    var askRevoke by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val sp = appCtx.getSharedPreferences("filyar_ui", android.content.Context.MODE_PRIVATE)
+        if (android.os.Build.VERSION.SDK_INT >= 30 && !com.filyar.app.ui.isAutoRevokeOff(appCtx) && !sp.getBoolean("revokeAsked", false)) {
+            askRevoke = true
+            sp.edit().putBoolean("revokeAsked", true).apply()
+        }
+    }
+    if (askRevoke) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { askRevoke = false },
+            title = { androidx.compose.material3.Text("جلوگیری از بسته شدن برنامه") },
+            text = {
+                androidx.compose.material3.Text(
+                    "اندروید ممکن است برنامه‌ای را که مدتی استفاده نشده خودکار ببندد. در صفحه‌ای که باز می‌شود، گزینه‌ی «مدیریت برنامه در صورت عدم استفاده» (Pause app activity if unused) را خاموش کنید.",
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    askRevoke = false
+                    com.filyar.app.ui.openAutoRevokeSettings(appCtx)
+                }) { androidx.compose.material3.Text("باز کردن تنظیمات") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { askRevoke = false }) { androidx.compose.material3.Text("بعداً") }
+            },
+        )
+    }
     apkPrompt?.let { ApkInstallDialog(it, vm) }
     zipPrompt?.let { ZipPreviewDialog(it, vm) }
 

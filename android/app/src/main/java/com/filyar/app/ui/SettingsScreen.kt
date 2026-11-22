@@ -142,6 +142,21 @@ fun SettingsScreen(vm: BrowserViewModel, snackbar: SnackbarHostState, onBack: ()
                 },
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
             ) { Text("بهینه‌سازی باتری برنامه") }
+            Label("جلوگیری از بسته شدن توسط اندروید")
+            var revokeOff by remember { mutableStateOf(isAutoRevokeOff(ctx)) }
+            Text(
+                if (revokeOff) "«مدیریت برنامه در صورت عدم استفاده» برای فایل‌یار خاموش است ✓"
+                else "«مدیریت برنامه در صورت عدم استفاده» روشن است و ممکن است برنامه را ببندد.",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+            )
+            OutlinedButton(
+                onClick = {
+                    openAutoRevokeSettings(ctx)
+                    revokeOff = isAutoRevokeOff(ctx)
+                },
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+            ) { Text("باز کردن تنظیمات آن") }
             Label("گزارش بسته شدن ناگهانی")
             var report by remember { mutableStateOf(readReport(ctx)) }
             Text(report, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))

@@ -43,6 +43,9 @@ import com.filyar.app.core.parentPath
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -1195,17 +1198,24 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
 
     fun loadApps() {
         viewModelScope.launch {
-            val list = withContext(Dispatchers.IO) { runCatching { readApps() }.getOrDefault(emptyList()) }
-            _apps.value = list
+            _apps.value = runCatching { readApps() }.getOrDefault(emptyList())
         }
     }
 
-    private fun readApps(): List<AppEntry> {
+    /** Only installed (non-system) apps; their names are read in parallel, which is what makes the screen quick. */
+    private suspend fun readApps(): List<AppEntry> = coroutineScope {
         val pm = getApplication<Application>().packageManager
-        return pm.getInstalledPackages(0).mapNotNull { pi ->
-            val ai = pi.applicationInfo ?: return@mapNotNull null
-            AppEntry(pi.packageName, ai.loadLabel(pm).toString(), pi.versionName ?: "", !isUserApp(ai), File(ai.sourceDir).length(), ai.sourceDir)
-        }.sortedBy { it.label.lowercase() }
+        val installed = pm.getInstalledPackages(0).filter { pi -> pi.applicationInfo?.let { isUserApp(it) } == true }
+        installed.chunked(16).map { chunk ->
+            async(Dispatchers.IO) {
+                chunk.mapNotNull { pi ->
+                    val ai = pi.applicationInfo ?: return@mapNotNull null
+                    AppEntry(pi.packageName, ai.loadLabel(pm).toString(), pi.versionName ?: "", false, File(ai.sourceDir).length(), ai.sourceDir)
+                }
+            }
+        }.awaitAll()
+            .flatten()
+            .sortedBy { it.label.lowercase() }
     }
 
     fun appSettings(pkg: String) {
@@ -1396,6 +1406,16 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     // ---------- built-in installer and ZIP preview ----------
     /** The mini audio player; it lives here so the music keeps playing while you move between screens. */
     val audio = MiniAudio.get(getApplication<Application>())
+
+    init {
+        // Warm up the apps screen: the app list now, and the APK file list a few seconds later when nothing else is scanning.
+        viewModelScope.launch {
+            delay(1500)
+            if (_apps.value == null) loadApps()
+            delay(6000)
+            if (!_clean.value.apksScanned && !_clean.value.scanning) scanApks()
+        }
+    }
 
     init {
         // The song before or after one (natural name order, same folder): used when a song ends and by next/previous.

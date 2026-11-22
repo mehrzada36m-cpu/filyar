@@ -725,3 +725,19 @@ fun MiniPlayerBottom(vm: BrowserViewModel) {
         }
     }
 }
+
+/** True when Android's "Pause app activity if unused" is already switched off for this app. */
+fun isAutoRevokeOff(context: Context): Boolean =
+    android.os.Build.VERSION.SDK_INT < 30 || context.packageManager.isAutoRevokeWhitelisted
+
+/** Opens the screen where that switch lives (an app cannot change it by itself). */
+fun openAutoRevokeSettings(context: Context) {
+    val pkg = Uri.parse("package:${context.packageName}")
+    val first = if (android.os.Build.VERSION.SDK_INT >= 30) Intent(Intent.ACTION_AUTO_REVOKE_PERMISSIONS, pkg)
+    else Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, pkg)
+    runCatching { context.startActivity(first.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.onFailure {
+        runCatching {
+            context.startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
+}
